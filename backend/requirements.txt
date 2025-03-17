@@ -1,0 +1,4 @@
+flask
+plivo
+requests
+python-dotenv
