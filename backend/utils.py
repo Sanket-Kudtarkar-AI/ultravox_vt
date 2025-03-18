@@ -33,7 +33,7 @@ def get_join_url(ultravox_payload):
 
         data = response.json()
         join_url = data.get("joinUrl")
-        call_id = data.get("id", "unknown")
+        call_id = data.get("callId", "unknown")
 
         logger.info(f"Received joinUrl: {join_url}")
         logger.info(f"Call ID: {call_id}")

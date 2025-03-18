@@ -218,8 +218,7 @@ def get_call_status(call_uuid):
                         "end_time": response.end_time if hasattr(response, 'end_time') else None,
                         "from_number": response.from_number if hasattr(response, 'from_number') else None,
                         "to_number": response.to_number if hasattr(response, 'to_number') else None,
-                        "hangup_cause_name": response.hangup_cause_name if hasattr(response,
-                                                                                   'hangup_cause_name') else None,
+                        "hangup_cause_name": response.hangup_cause_name if hasattr(response, 'hangup_cause_name') else None,
                         "hangup_source": response.hangup_source if hasattr(response, 'hangup_source') else None,
                         "initiation_time": response.initiation_time if hasattr(response, 'initiation_time') else None
                     }
@@ -278,10 +277,10 @@ def get_recent_calls():
         # Format the response
         calls = []
         for call in response:
-            ultravox_call_id = ultravox_mapping.get(call.call_uuid)
+            found_ultravox_id = ultravox_mapping.get(call.call_uuid)
             calls.append({
                 "call_uuid": call.call_uuid,
-                "ultravox_call_id": ultravox_call_id,  # Include Ultravox call ID if available
+                "ultravox_call_id": found_ultravox_id,  # Include Ultravox call ID if available
                 "from_number": call.from_number,
                 "to_number": call.to_number,
                 "call_direction": call.call_direction,

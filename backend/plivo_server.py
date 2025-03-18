@@ -48,17 +48,14 @@ def answer_url():
     initial_messages = current_app.config.get("CUSTOM_INITIAL_MESSAGES", [])
 
     # Format initial messages correctly for Ultravox API
-    # Note: Ultravox API expects initial messages to have text property only, no role
     formatted_initial_messages = []
     for msg in initial_messages:
         if isinstance(msg, str):
             formatted_initial_messages.append({"text": msg})
         elif isinstance(msg, dict) and "text" in msg:
-            # Keep only the text field
             formatted_initial_messages.append({"text": msg["text"]})
 
-    inactivity_messages = current_app.config.get("CUSTOM_INACTIVITY_MESSAGES",
-                                                 [{"duration": "8s", "message": "are you there?"}])
+    inactivity_messages = current_app.config.get("CUSTOM_INACTIVITY_MESSAGES", [{"duration": "8s", "message": "are you there?"}])
     recording_enabled = current_app.config.get("CUSTOM_RECORDING_ENABLED", True)
 
     logger.info(f"Using system_prompt: {system_prompt[:50]}...")

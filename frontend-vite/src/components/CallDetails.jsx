@@ -47,11 +47,24 @@ const CallDetails = ({ call, onRefreshStatus, loading, onViewAnalysis }) => {
                 </div>
               </div>
 
+              {/* Display the Ultravox Call ID */}
+              <div className="flex items-start">
+                <User className="w-5 h-5 text-gray-500 mt-0.5 mr-3" />
+                <div>
+                  <div className="text-sm text-gray-400">Ultravox Call ID</div>
+                  <div className="font-medium break-all text-white">
+                    {call.ultravox_call_id || 'N/A'}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-start">
                 <User className="w-5 h-5 text-gray-500 mt-0.5 mr-3" />
                 <div>
                   <div className="text-sm text-gray-400">From / To</div>
-                  <div className="font-medium text-white">{call.from_number} → {call.to_number}</div>
+                  <div className="font-medium text-white">
+                    {call.from_number} → {call.to_number}
+                  </div>
                 </div>
               </div>
             </div>

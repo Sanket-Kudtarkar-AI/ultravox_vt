@@ -5,6 +5,62 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-03-20
+
+### Added
+- Enhanced Analysis component to handle conversations of all sizes
+- Multi-source duration calculation with fallback mechanisms
+- Voice-only input detection and statistics
+- Duration details section in Analytics tab
+- Improved handling of missing text fields in messages
+- Comprehensive error handling for API responses
+- Detailed logging throughout the application
+
+### Fixed
+- Resolved "Cannot read properties of undefined" error for large conversations
+- Fixed call duration calculation to properly display time formats
+- Corrected message display to show full content without truncation
+- Fixed Ultravox call ID mapping (changed "id" to "callId" in API handling)
+- Improved error state display for missing data
+- Enhanced API error response handling
+
+### Changed
+- Updated Analysis.jsx to display full message content by default
+- Improved duration formatting to support hours:minutes:seconds format
+- Enhanced duration display to show values from multiple sources
+- Redesigned Analytics tab with improved data organization
+- Updated message rendering to handle voice-only inputs
+- Improved handling of role-based styling in message display
+
+## [1.2.0] - 2025-03-19
+
+### Added
+- Call Analysis component for real-time analysis of call transcriptions
+- Call recording playback and download capability
+- Comprehensive call analytics with message statistics
+- Call transcription display with role-based styling
+- Database integration for persistent call mapping storage
+- API endpoints for retrieving call analytics and transcriptions
+- Ultravox-Plivo call ID mapping mechanism
+- Helper endpoints for debugging call mappings
+
+### Fixed
+- Fixed issue with Ultravox call ID retrieval (changed "id" to "callId" in API handling)
+- Resolved "Cannot read properties of undefined" error in Analysis component
+- Fixed duration calculation to properly handle different data sources
+- Improved message display to handle missing text fields in transcripts
+- Enhanced error handling in API controllers with proper logging
+- Added proper frontend error states for missing call mappings
+
+### Changed
+- Updated Analysis component to display full messages by default without truncation
+- Enhanced duration calculation with multiple fallback approaches
+- Improved formatting for call duration display with hours, minutes, and seconds
+- Added additional duration information sources in Analytics tab
+- Updated API controllers to better handle mapping between Plivo and Ultravox
+- Enhanced ViewCallAnalysis function to handle multiple data sources
+- Reorganized call transcript display with better formatting and information
+
 ## [1.1.0] - 2025-03-18
 
 ### Added
