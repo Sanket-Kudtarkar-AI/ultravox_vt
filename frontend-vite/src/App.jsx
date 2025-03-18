@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {Phone, Activity, PhoneIcon, Clock, Settings, Users, X} from 'lucide-react';
+import {Phone, Activity, PhoneIcon, Clock, Settings, Users, X, BarChart} from 'lucide-react';
 import './App.css';
 import CallDetails from './components/CallDetails';
 import NewCallForm from './components/NewCallForm';
@@ -8,6 +8,7 @@ import CallStatus from './components/CallStatus';
 import Sidebar from './components/Sidebar';
 import AgentForm from './components/AgentForm';
 import AgentSelector from './components/AgentSelector';
+import Analysis from './components/Analysis';
 
 // Generate a unique ID
 const generateId = () => `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -34,6 +35,9 @@ function App() {
 
     // Server status monitoring
     const [serverStatus, setServerStatus] = useState('unknown');
+
+    // Call analysis state
+    const [callAnalysisData, setCallAnalysisData] = useState(null);
 
     // API base URL - update this to your actual API endpoint
     const API_BASE_URL = 'http://localhost:5000/api';
@@ -318,6 +322,7 @@ function App() {
                 setActiveCall({
                     ...callData,
                     call_uuid: data.call_uuid,
+                    ultravoxCallId: data.ultravox_call_id, // Store Ultravox call ID
                     status: 'initiated',
                     timestamp: data.timestamp
                 });
@@ -370,6 +375,91 @@ function App() {
         setCurrentView('call-details');
     };
 
+    // View call analysis
+    // Updated viewCallAnalysis function for App.jsx
+    const viewCallAnalysis = (call) => {
+        // For Ultravox calls, we need both the callId from Ultravox and the callUuid from Plivo
+        let ultravoxCallId = null;
+
+        // Reset any previous analysis data
+        setLoading(true);
+
+        // If this call already has a stored Ultravox callId (from an active call or details response)
+        if (call.ultravox_call_id) {
+            setCallAnalysisData({
+                callUuid: call.call_uuid,
+                ultravoxCallId: call.ultravox_call_id,
+                callDetails: call
+            });
+            setCurrentView('call-analysis');
+            setLoading(false);
+        }
+        // Check for the old property name (used in frontend only)
+        else if (call.ultravoxCallId) {
+            setCallAnalysisData({
+                callUuid: call.call_uuid,
+                ultravoxCallId: call.ultravoxCallId,
+                callDetails: call
+            });
+            setCurrentView('call-analysis');
+            setLoading(false);
+        }
+        // Check if the Ultravox ID is in the details object
+        else if (call.details && call.details.ultravox_call_id) {
+            setCallAnalysisData({
+                callUuid: call.call_uuid,
+                ultravoxCallId: call.details.ultravox_call_id,
+                callDetails: call
+            });
+            setCurrentView('call-analysis');
+            setLoading(false);
+        }
+        // If this is from call history, fetch the mapping from backend
+        else {
+            // Fetch the mapping from the backend
+            fetch(`${API_BASE_URL}/call_mapping/${call.call_uuid}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.mapping) {
+                        setCallAnalysisData({
+                            callUuid: call.call_uuid,
+                            ultravoxCallId: data.mapping.ultravox_call_id,
+                            callDetails: call
+                        });
+                        setCurrentView('call-analysis');
+                    } else {
+                        // If mapping not found, still show analysis but with limited functionality
+                        setCallAnalysisData({
+                            callUuid: call.call_uuid,
+                            ultravoxCallId: null,
+                            callDetails: call,
+                            mappingNotFound: true
+                        });
+                        setCurrentView('call-analysis');
+                        showNotification('warning', 'Limited analysis available: Ultravox data mapping not found');
+
+                        // Log this for debugging
+                        console.warn(`No Ultravox mapping found for call UUID: ${call.call_uuid}`);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching call mapping:', err);
+                    // Still show analysis with limited functionality
+                    setCallAnalysisData({
+                        callUuid: call.call_uuid,
+                        ultravoxCallId: null,
+                        callDetails: call,
+                        mappingNotFound: true
+                    });
+                    setCurrentView('call-analysis');
+                    showNotification('error', 'Error retrieving call analysis data');
+                })
+                .finally(() => {
+                    setLoading(false);
+                });
+        }
+    };
+
     // Display notification
     const showNotification = (type, message) => {
         setNotification({type, message});
@@ -399,9 +489,10 @@ function App() {
             <div className="flex-1 overflow-auto bg-gradient-to-b from-gray-900 to-gray-800">
                 {/* Notification */}
                 {notification && (
-                    <div className={`fixed top-4 right-4 max-w-md p-4 rounded-lg shadow-lg flex items-start z-50 animate-slide-in-left ${
-                        notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                    <div
+                        className={`fixed top-4 right-4 max-w-md p-4 rounded-lg shadow-lg flex items-start z-50 animate-slide-in-left ${
+                            notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                        }`}>
                         <div className="flex-1">{notification.message}</div>
                         <button
                             onClick={() => setNotification(null)}
@@ -418,7 +509,8 @@ function App() {
                         <h1 className="text-3xl font-bold mb-6 text-white">Dashboard</h1>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-100">
+                            <div
+                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-100">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-medium text-white">Quick Actions</h3>
                                     <Phone className="text-blue-400"/>
@@ -432,7 +524,8 @@ function App() {
                                 </button>
                             </div>
 
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-200">
+                            <div
+                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-200">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-medium text-white">My Agents</h3>
                                     <Users className="text-blue-400"/>
@@ -479,7 +572,8 @@ function App() {
                                 )}
                             </div>
 
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-300">
+                            <div
+                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-300">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-medium text-white">Recent Activity</h3>
                                     <Clock className="text-blue-400"/>
@@ -568,6 +662,13 @@ function App() {
                             >
                                 Make Another Call
                             </button>
+                            <button
+                                onClick={() => viewCallAnalysis(activeCall)}
+                                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center"
+                            >
+                                <BarChart size={18} className="mr-2"/>
+                                View Analysis
+                            </button>
                         </div>
                     </div>
                 )}
@@ -581,6 +682,7 @@ function App() {
                             loading={loading}
                             onRefresh={fetchRecentCalls}
                             onViewDetails={viewCallDetails}
+                            onViewAnalysis={viewCallAnalysis}
                         />
                     </div>
                 )}
@@ -593,6 +695,28 @@ function App() {
                             call={activeCall}
                             onRefreshStatus={() => getCallStatus(activeCall.call_uuid)}
                             loading={loading}
+                            onViewAnalysis={viewCallAnalysis}
+                        />
+                        <div className="mt-4">
+                            <button
+                                onClick={() => setCurrentView('recent-calls')}
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                            >
+                                Back to Recent Calls
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Call Analysis View */}
+                {currentView === 'call-analysis' && callAnalysisData && (
+                    <div className="p-6 text-gray-300">
+                        <h1 className="text-3xl font-bold mb-6 text-white">Call Analysis</h1>
+                        <Analysis
+                            callId={callAnalysisData.ultravoxCallId}
+                            callUuid={callAnalysisData.callUuid}
+                            onClose={() => setCurrentView('recent-calls')}
+                            serverStatus={serverStatus}
                         />
                         <div className="mt-4">
                             <button

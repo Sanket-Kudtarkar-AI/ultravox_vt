@@ -1,7 +1,7 @@
 import React from 'react';
-import { RefreshCw, Info, PhoneCall } from 'lucide-react';
+import { RefreshCw, Info, PhoneCall, BarChart } from 'lucide-react';
 
-const RecentCalls = ({ calls, loading, onRefresh, onViewDetails }) => {
+const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis }) => {
   // Helper function to format call status
   const getStatusBadge = (status) => {
     if (status === 'ANSWER') {
@@ -78,13 +78,23 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails }) => {
                     {getStatusBadge(call.call_state)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => onViewDetails(call)}
-                      className="text-blue-400 hover:text-blue-300 flex items-center"
-                    >
-                      <Info size={14} className="mr-1" />
-                      Details
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => onViewDetails(call)}
+                        className="text-blue-400 hover:text-blue-300 flex items-center"
+                      >
+                        <Info size={14} className="mr-1" />
+                        Details
+                      </button>
+
+                      <button
+                        onClick={() => onViewAnalysis(call)}
+                        className="text-blue-400 hover:text-blue-300 flex items-center ml-3"
+                      >
+                        <BarChart size={14} className="mr-1" />
+                        Analysis
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

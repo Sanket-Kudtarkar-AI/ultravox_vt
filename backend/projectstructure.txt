@@ -1,34 +1,38 @@
 ultravoxcalls/
 │
-├── backend/                   # Flask backend
-│   ├── app.py                 # Main Flask application
-│   ├── api_controller.py      # API endpoints and Plivo integration
-│   ├── ultravox_client.py     # Client for Ultravox AI voice service
-│   ├── requirements.txt       # Python dependencies
-│   └── templates/             # If there are any server-rendered templates
+├── backend/
+│   ├── plivo_server.py            # Updated main Flask application
+│   ├── api_controller.py          # Updated API endpoints for Plivo
+│   ├── analysis_controller.py     # New controller for analysis features
+│   ├── utils.py                   # Utility functions (including get_join_url)
+│   ├── models.py                  # Database models including CallMapping
+│   ├── database.py                # Database setup and session management
+│   ├── config.py                  # Configuration and constants
+│   ├── requirements.txt           # Python dependencies
+│   └── calls.db                   # SQLite database file
 │
-├── frontend/                  # React frontend
-│   ├── public/                # Static assets
+├── frontend/
+│   ├── public/
 │   ├── src/
-│   │   ├── App.jsx            # Main application component
-│   │   ├── App.css            # App-specific styles
-│   │   ├── index.js           # Entry point
-│   │   ├── index.css          # Global styles with Tailwind
+│   │   ├── App.jsx                # Updated with improved viewCallAnalysis
+│   │   ├── App.css
+│   │   ├── index.js
+│   │   ├── index.css              # Global styles with Tailwind
 │   │   ├── components/
-│   │   │   ├── Sidebar.jsx    # Navigation sidebar
-│   │   │   ├── AgentSelector.jsx  # Agent selection modal
-│   │   │   ├── AgentForm.jsx  # Form for creating/editing agents
-│   │   │   ├── NewCallForm.jsx  # Form for initiating calls
-│   │   │   ├── CallStatus.jsx  # Component for displaying call status
-│   │   │   ├── CallDetails.jsx  # Component for detailed call info
-│   │   │   └── RecentCalls.jsx  # Component for displaying call history
+│   │   │   ├── Sidebar.jsx
+│   │   │   ├── AgentSelector.jsx
+│   │   │   ├── AgentForm.jsx
+│   │   │   ├── NewCallForm.jsx
+│   │   │   ├── CallStatus.jsx     # Updated to include Analysis button
+│   │   │   ├── CallDetails.jsx    # Updated to include Analysis button
+│   │   │   ├── RecentCalls.jsx    # Updated to include Analysis button
+│   │   │   └── Analysis.jsx       # New component for call analysis
 │   │   ├── utils/
-│   │   │   └── helpers.js     # Utility functions
 │   │   └── assets/
-│   │       └── icons/         # Icon assets if not using Lucide
-│   ├── package.json           # Node dependencies
-│   ├── tailwind.config.js     # Tailwind CSS configuration
-│   └── postcss.config.js      # PostCSS configuration for Tailwind
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── postcss.config.js
 │
-├── README.md                  # Project documentation
-└── .gitignore                 # Git ignore file
+├── README.md
+├── CHANGELOG.md
+└── debugging-guide.md             # New guide for troubleshooting

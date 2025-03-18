@@ -1,7 +1,7 @@
 import React from 'react';
-import { Phone, Calendar, Clock, User, RefreshCw } from 'lucide-react';
+import { Phone, Calendar, Clock, User, RefreshCw, BarChart } from 'lucide-react';
 
-const CallDetails = ({ call, onRefreshStatus, loading }) => {
+const CallDetails = ({ call, onRefreshStatus, loading, onViewAnalysis }) => {
   const formatPropertyValue = (value) => {
     if (value === null || value === undefined) return 'N/A';
     if (typeof value === 'object') return JSON.stringify(value, null, 2);
@@ -149,6 +149,16 @@ const CallDetails = ({ call, onRefreshStatus, loading }) => {
             </table>
           </div>
         </div>
+      </div>
+
+      <div className="mt-4 p-6 border-t border-gray-700 flex">
+        <button
+          onClick={() => onViewAnalysis(call)}
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center mr-2"
+        >
+          <BarChart size={18} className="mr-2" />
+          View Analysis
+        </button>
       </div>
     </div>
   );
