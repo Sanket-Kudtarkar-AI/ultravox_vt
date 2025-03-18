@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime
 
-from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT
+from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT, DEFAULT_VAD_SETTINGS
 from utils import get_join_url
 
 # Set up logging
@@ -19,31 +19,6 @@ api = Blueprint('api', __name__)
 def make_call_api():
     """
     API endpoint for making a call with custom parameters.
-
-    Expected JSON body:
-    {
-        "recipient_phone_number": "+1234567890",
-        "plivo_phone_number": "+1987654321",
-        "system_prompt": "Custom system prompt",
-        "language_hint": "en",
-        "max_duration": "180s",
-        "voice": "Maushmi",
-        "vad_settings": {
-            "turnEndpointDelay": "0.384s",
-            "minimumTurnDuration": "0s",
-            "minimumInterruptionDuration": "0.05s",
-            "frameActivationThreshold": 0.1
-        },
-        "initial_messages": ["Welcome to our service."],
-        "inactivity_messages": [
-            {
-                "duration": "8s",
-                "message": "Are you there?",
-                "endBehavior": "END_BEHAVIOR_UNSPECIFIED"
-            }
-        ],
-        "recording_enabled": true
-    }
     """
     try:
         data = request.json
@@ -65,7 +40,17 @@ def make_call_api():
         max_duration = data.get("max_duration", "180s")
         voice = data.get("voice", "Maushmi")
         vad_settings = data.get("vad_settings", DEFAULT_VAD_SETTINGS)
+
+        # Handle initial_messages formatting
         initial_messages = data.get("initial_messages", [])
+        # Format for Ultravox API - it only needs the text field
+        formatted_initial_messages = []
+        for msg in initial_messages:
+            if isinstance(msg, str):
+                formatted_initial_messages.append({"text": msg})
+            elif isinstance(msg, dict) and "text" in msg:
+                formatted_initial_messages.append({"text": msg["text"]})
+
         inactivity_messages = data.get("inactivity_messages", [{"duration": "8s", "message": "are you there?"}])
         recording_enabled = data.get("recording_enabled", True)
 
@@ -92,7 +77,7 @@ def make_call_api():
         current_app.config["CUSTOM_VOICE"] = voice
         current_app.config["CUSTOM_MAX_DURATION"] = max_duration
         current_app.config["CUSTOM_VAD_SETTINGS"] = vad_settings
-        current_app.config["CUSTOM_INITIAL_MESSAGES"] = initial_messages
+        current_app.config["CUSTOM_INITIAL_MESSAGES"] = formatted_initial_messages
         current_app.config["CUSTOM_INACTIVITY_MESSAGES"] = inactivity_messages
         current_app.config["CUSTOM_RECORDING_ENABLED"] = recording_enabled
 
@@ -125,6 +110,7 @@ def make_call_api():
             "message": str(e)
         }), 500
 
+
 @api.route('/call_status/<call_uuid>', methods=['GET'])
 def get_call_status(call_uuid):
     """
@@ -136,7 +122,10 @@ def get_call_status(call_uuid):
 
         # Try to get live call status first
         try:
-            response = plivo_client.live_calls.get(call_uuid=call_uuid)
+            # Use the correct method for getting live call details
+            # Based on your previous code in test.py, this should work
+            response = plivo_client.live_calls.get(call_uuid)
+
             return jsonify({
                 "status": "success",
                 "call_status": "live",
@@ -155,7 +144,7 @@ def get_call_status(call_uuid):
             logger.info(f"Live call not found for UUID {call_uuid}. Checking call history.")
 
             try:
-                response = plivo_client.calls.get(call_uuid=call_uuid)
+                response = plivo_client.calls.get(call_uuid)
                 return jsonify({
                     "status": "success",
                     "call_status": "completed",
@@ -180,6 +169,12 @@ def get_call_status(call_uuid):
                     "status": "error",
                     "message": "Call not found in either live or completed calls"
                 }), 404
+        except Exception as e:
+            logger.error(f"Error getting live call: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": f"Error getting live call: {str(e)}"
+            }), 500
 
     except Exception as e:
         logger.error(f"Error in get_call_status: {str(e)}")
@@ -187,6 +182,7 @@ def get_call_status(call_uuid):
             "status": "error",
             "message": str(e)
         }), 500
+
 
 
 @api.route('/recent_calls', methods=['GET'])

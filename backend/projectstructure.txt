@@ -1,0 +1,34 @@
+ultravoxcalls/
+│
+├── backend/                   # Flask backend
+│   ├── app.py                 # Main Flask application
+│   ├── api_controller.py      # API endpoints and Plivo integration
+│   ├── ultravox_client.py     # Client for Ultravox AI voice service
+│   ├── requirements.txt       # Python dependencies
+│   └── templates/             # If there are any server-rendered templates
+│
+├── frontend/                  # React frontend
+│   ├── public/                # Static assets
+│   ├── src/
+│   │   ├── App.jsx            # Main application component
+│   │   ├── App.css            # App-specific styles
+│   │   ├── index.js           # Entry point
+│   │   ├── index.css          # Global styles with Tailwind
+│   │   ├── components/
+│   │   │   ├── Sidebar.jsx    # Navigation sidebar
+│   │   │   ├── AgentSelector.jsx  # Agent selection modal
+│   │   │   ├── AgentForm.jsx  # Form for creating/editing agents
+│   │   │   ├── NewCallForm.jsx  # Form for initiating calls
+│   │   │   ├── CallStatus.jsx  # Component for displaying call status
+│   │   │   ├── CallDetails.jsx  # Component for detailed call info
+│   │   │   └── RecentCalls.jsx  # Component for displaying call history
+│   │   ├── utils/
+│   │   │   └── helpers.js     # Utility functions
+│   │   └── assets/
+│   │       └── icons/         # Icon assets if not using Lucide
+│   ├── package.json           # Node dependencies
+│   ├── tailwind.config.js     # Tailwind CSS configuration
+│   └── postcss.config.js      # PostCSS configuration for Tailwind
+│
+├── README.md                  # Project documentation
+└── .gitignore                 # Git ignore file

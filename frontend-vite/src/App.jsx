@@ -1,12 +1,19 @@
 import React, {useState, useEffect} from 'react';
-import {Phone, Activity, Phone as PhoneIcon, Clock, Users, Settings, ChevronRight, X} from 'lucide-react';
+import {Phone, Activity, PhoneIcon, Clock, Settings, Users, X} from 'lucide-react';
 import './App.css';
 import CallDetails from './components/CallDetails';
 import NewCallForm from './components/NewCallForm';
 import RecentCalls from './components/RecentCalls';
 import CallStatus from './components/CallStatus';
+import Sidebar from './components/Sidebar';
+import AgentForm from './components/AgentForm';
+import AgentSelector from './components/AgentSelector';
+
+// Generate a unique ID
+const generateId = () => `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
 function App() {
+    // App state
     const [currentView, setCurrentView] = useState('dashboard');
     const [activeCall, setActiveCall] = useState(null);
     const [recentCalls, setRecentCalls] = useState([]);
@@ -14,8 +21,130 @@ function App() {
     const [error, setError] = useState(null);
     const [notification, setNotification] = useState(null);
 
+    // Agent management state
+    const [agents, setAgents] = useState([]);
+    const [selectedAgentId, setSelectedAgentId] = useState(null);
+    const [currentAgent, setCurrentAgent] = useState(null);
+    const [isAgentFormOpen, setIsAgentFormOpen] = useState(false);
+    const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
+    const [isEditingAgent, setIsEditingAgent] = useState(false);
+
+    // Call recipient history
+    const [savedRecipients, setSavedRecipients] = useState([]);
+
+    // Server status monitoring
+    const [serverStatus, setServerStatus] = useState('unknown');
+
     // API base URL - update this to your actual API endpoint
     const API_BASE_URL = 'http://localhost:5000/api';
+
+    // Load agents and recipients from localStorage on component mount
+    useEffect(() => {
+        try {
+            // Load agents with proper error handling
+            const savedAgents = localStorage.getItem('agents');
+            if (savedAgents) {
+                const parsedAgents = JSON.parse(savedAgents);
+                if (Array.isArray(parsedAgents) && parsedAgents.length > 0) {
+                    setAgents(parsedAgents);
+
+                    // Set the oldest agent as default selected if none is currently selected
+                    if (!selectedAgentId) {
+                        const oldestAgent = [...parsedAgents].sort((a, b) =>
+                            new Date(a.created_at) - new Date(b.created_at)
+                        )[0];
+                        setSelectedAgentId(oldestAgent.id);
+                    }
+                }
+            }
+
+            // Load saved recipients with proper error handling
+            const savedRecipientsList = localStorage.getItem('recipients');
+            if (savedRecipientsList) {
+                try {
+                    const parsedRecipients = JSON.parse(savedRecipientsList);
+                    if (Array.isArray(parsedRecipients)) {
+                        setSavedRecipients(parsedRecipients);
+                    }
+                } catch (error) {
+                    console.error('Error parsing saved recipients:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading saved data:', error);
+        }
+    }, []);
+
+    // Save agents to localStorage when they change
+    useEffect(() => {
+        try {
+            if (agents && agents.length > 0) {
+                console.log('Saving agents to localStorage:', agents);
+                localStorage.setItem('agents', JSON.stringify(agents));
+            } else {
+                // Don't overwrite existing agents with an empty array
+                const existingAgents = localStorage.getItem('agents');
+                if (!existingAgents) {
+                    localStorage.setItem('agents', JSON.stringify([]));
+                }
+            }
+        } catch (error) {
+            console.error('Error saving agents to localStorage:', error);
+        }
+    }, [agents]);
+
+    // Save recipients to localStorage when they change
+    useEffect(() => {
+        try {
+            if (savedRecipients && savedRecipients.length > 0) {
+                console.log('Saving recipients to localStorage:', savedRecipients);
+                localStorage.setItem('recipients', JSON.stringify(savedRecipients));
+            } else {
+                // Don't overwrite existing recipients with an empty array
+                const existingRecipients = localStorage.getItem('recipients');
+                if (!existingRecipients) {
+                    localStorage.setItem('recipients', JSON.stringify([]));
+                }
+            }
+        } catch (error) {
+            console.error('Error saving recipients to localStorage:', error);
+        }
+    }, [savedRecipients]);
+
+    // Server status check
+    const checkServerStatus = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL.replace('/api', '')}/status`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                // Add a cache-busting parameter to prevent caching
+                cache: 'no-store',
+            });
+
+            if (response.ok) {
+                setServerStatus('online');
+            } else {
+                setServerStatus('offline');
+            }
+        } catch (err) {
+            setServerStatus('offline');
+        }
+    };
+
+    // Check server status every second
+    useEffect(() => {
+        checkServerStatus(); // Check immediately on mount
+
+        const intervalId = setInterval(() => {
+            checkServerStatus();
+        }, 1000);
+
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, []);
 
     // Fetch recent calls on component mount
     useEffect(() => {
@@ -23,6 +152,101 @@ function App() {
             fetchRecentCalls();
         }
     }, [currentView]);
+
+    // Agent management functions
+    const handleCreateAgent = () => {
+        setCurrentAgent(null);
+        setIsEditingAgent(false);
+        setIsAgentFormOpen(true);
+        setCurrentView('agent-form');
+    };
+
+    const handleEditAgent = (agentId) => {
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+            setCurrentAgent(agent);
+            setIsEditingAgent(true);
+            setIsAgentFormOpen(true);
+            setCurrentView('agent-form');
+        }
+    };
+
+    const handleDuplicateAgent = (agentId) => {
+        const agent = agents.find(a => a.id === agentId);
+        if (agent) {
+            const duplicateAgent = {
+                ...agent,
+                id: generateId(),
+                name: `${agent.name} (Copy)`,
+                created_at: new Date().toISOString()
+            };
+            setAgents([...agents, duplicateAgent]);
+            showNotification('success', `Agent "${agent.name}" duplicated successfully`);
+        }
+    };
+
+    const handleDeleteAgent = (agentId) => {
+        if (window.confirm('Are you sure you want to delete this agent?')) {
+            setAgents(agents.filter(a => a.id !== agentId));
+            if (selectedAgentId === agentId) {
+                setSelectedAgentId(null);
+            }
+            showNotification('success', 'Agent deleted successfully');
+        }
+    };
+
+    const handleSaveAgent = (agent) => {
+        try {
+            if (isEditingAgent) {
+                // Update existing agent
+                const updatedAgents = agents.map(a => a.id === agent.id ? agent : a);
+                console.log('Updating agent:', agent);
+                setAgents(updatedAgents);
+                showNotification('success', `Agent "${agent.name}" updated successfully`);
+            } else {
+                // Create new agent
+                const newAgent = {
+                    ...agent,
+                    id: generateId(),
+                    created_at: new Date().toISOString()
+                };
+                console.log('Creating new agent:', newAgent);
+                setAgents(prevAgents => {
+                    const newAgents = [...prevAgents, newAgent];
+                    // Immediately save to localStorage as a safeguard
+                    try {
+                        localStorage.setItem('agents', JSON.stringify(newAgents));
+                    } catch (error) {
+                        console.error('Error immediately saving agents to localStorage:', error);
+                    }
+                    return newAgents;
+                });
+                showNotification('success', `Agent "${agent.name}" created successfully`);
+            }
+
+            setIsAgentFormOpen(false);
+            setCurrentView('dashboard');
+        } catch (error) {
+            console.error('Error saving agent:', error);
+            showNotification('error', 'Error saving agent. Please try again.');
+        }
+    };
+
+    const handleSelectAgent = (agentId) => {
+        if (agentId === null) {
+            setIsAgentSelectorOpen(true);
+        } else {
+            setSelectedAgentId(agentId);
+            // Open the edit form when selecting an agent
+            const agent = agents.find(a => a.id === agentId);
+            if (agent) {
+                setCurrentAgent(agent);
+                setIsEditingAgent(true);
+                setIsAgentFormOpen(true);
+                setCurrentView('agent-form');
+            }
+        }
+    };
 
     // Fetch recent calls
     const fetchRecentCalls = async () => {
@@ -45,34 +269,39 @@ function App() {
     };
 
     // Make a new call
-    // Update the makeCall function in App.jsx to handle the new form structure
-
     const makeCall = async (callData) => {
         try {
             setLoading(true);
 
-            // Transform the form data to the API expected format
+            // Save recipient number if not already saved
+            if (callData.recipient_phone_number && !savedRecipients.includes(callData.recipient_phone_number)) {
+                setSavedRecipients(prev => {
+                    const newRecipients = [...prev, callData.recipient_phone_number];
+                    // Immediately save to localStorage
+                    try {
+                        localStorage.setItem('recipients', JSON.stringify(newRecipients));
+                    } catch (error) {
+                        console.error('Error saving recipients to localStorage:', error);
+                    }
+                    return newRecipients;
+                });
+            }
+
+            // Format initial messages correctly for the API
+            const formattedInitialMessages = callData.initial_messages
+                ? callData.initial_messages
+                    .filter(msg => msg && msg.trim() !== '')
+                    .map(message => ({
+                        text: message,
+                        role: "assistant"
+                    }))
+                : [];
+
+            // Prepare API call data with correctly formatted initial messages
             const apiCallData = {
-                recipient_phone_number: callData.recipient_phone_number,
-                plivo_phone_number: callData.plivo_phone_number,
-                system_prompt: callData.system_prompt,
-                language_hint: callData.language_hint,
-                max_duration: callData.max_duration,
-                voice: callData.voice,
-                // Add additional parameters if your API supports them
-                vad_settings: callData.vad_settings,
-                recording_enabled: callData.recording_enabled
+                ...callData,
+                initial_messages: formattedInitialMessages
             };
-
-            // Handle initial messages if any were provided
-            if (callData.initial_messages && callData.initial_messages.length > 0) {
-                apiCallData.initial_messages = callData.initial_messages;
-            }
-
-            // Handle inactivity messages if any were provided
-            if (callData.inactivity_messages && callData.inactivity_messages.length > 0) {
-                apiCallData.inactivity_messages = callData.inactivity_messages;
-            }
 
             const response = await fetch(`${API_BASE_URL}/make_call`, {
                 method: 'POST',
@@ -85,28 +314,19 @@ function App() {
             const data = await response.json();
 
             if (data.status === 'success') {
-                setNotification({
-                    type: 'success',
-                    message: `Call initiated successfully. Call UUID: ${data.call_uuid}`
-                });
+                showNotification('success', `Call initiated successfully. Call UUID: ${data.call_uuid}`);
                 setActiveCall({
-                    ...apiCallData,
+                    ...callData,
                     call_uuid: data.call_uuid,
                     status: 'initiated',
                     timestamp: data.timestamp
                 });
                 setCurrentView('call-status');
             } else {
-                setNotification({
-                    type: 'error',
-                    message: data.message || 'Failed to initiate call'
-                });
+                showNotification('error', data.message || 'Failed to initiate call');
             }
         } catch (err) {
-            setNotification({
-                type: 'error',
-                message: 'Error connecting to server. Please check your connection.'
-            });
+            showNotification('error', 'Error connecting to server. Please check your connection.');
             console.error('Error making call:', err);
         } finally {
             setLoading(false);
@@ -131,12 +351,13 @@ function App() {
                 }));
                 return data;
             } else {
-                setError(data.message || 'Failed to fetch call status');
+                console.error('Error in call status response:', data.message);
+                showNotification('error', data.message || 'Failed to fetch call status');
                 return null;
             }
         } catch (err) {
-            setError('Error connecting to server. Please check your connection.');
             console.error('Error fetching call status:', err);
+            showNotification('error', 'Error connecting to server. Please check your connection.');
             return null;
         } finally {
             setLoading(false);
@@ -149,69 +370,36 @@ function App() {
         setCurrentView('call-details');
     };
 
-    // Clear notification after 5 seconds
-    useEffect(() => {
-        if (notification) {
-            const timer = setTimeout(() => {
-                setNotification(null);
-            }, 5000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [notification]);
-
-    // Navigation items
-    const navItems = [
-        {id: 'dashboard', icon: <Activity size={20}/>, label: 'Dashboard'},
-        {id: 'new-call', icon: <Phone size={20}/>, label: 'New Call'},
-        {id: 'recent-calls', icon: <Clock size={20}/>, label: 'Recent Calls'},
-        {id: 'settings', icon: <Settings size={20}/>, label: 'Settings'},
-    ];
+    // Display notification
+    const showNotification = (type, message) => {
+        setNotification({type, message});
+        // Clear notification after 5 seconds
+        setTimeout(() => {
+            setNotification(null);
+        }, 5000);
+    };
 
     return (
-        <div className="flex h-screen bg-gray-100">
+        <div className="flex h-screen w-screen bg-gray-100 overflow-hidden">
             {/* Sidebar */}
-            <div className="bg-gradient-to-b from-gray-900 to-gray-800 w-64 p-4 flex flex-col">
-                <div className="text-white text-xl font-bold mb-8 flex items-center">
-                    <PhoneIcon className="mr-2 text-blue-400"/>
-                    <span>AI Call Manager</span>
-                </div>
-
-                <nav className="flex-1">
-                    <ul className="space-y-2">
-                        {navItems.map(item => (
-                            <li key={item.id}>
-                                <button
-                                    onClick={() => setCurrentView(item.id)}
-                                    className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
-                                        currentView === item.id
-                                            ? 'bg-blue-500/20 text-blue-400'
-                                            : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
-                                    }`}
-                                >
-                                    <div className="mr-3">{item.icon}</div>
-                                    <span>{item.label}</span>
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
-
-                <div className="mt-auto pt-4 border-t border-gray-700">
-                    <div className="text-gray-400 text-sm">
-                        <div className="flex items-center">
-                            <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                            <span>Server Status: Online</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <Sidebar
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+                agents={agents}
+                selectedAgentId={selectedAgentId}
+                onSelectAgent={handleSelectAgent}
+                onCreateAgent={handleCreateAgent}
+                onDeleteAgent={handleDeleteAgent}
+                onDuplicateAgent={handleDuplicateAgent}
+                onEditAgent={handleEditAgent}
+                serverStatus={serverStatus}
+            />
 
             {/* Main Content */}
             <div className="flex-1 overflow-auto bg-gradient-to-b from-gray-900 to-gray-800">
                 {/* Notification */}
                 {notification && (
-                    <div className={`fixed top-4 right-4 max-w-md p-4 rounded-lg shadow-lg flex items-start z-50 ${
+                    <div className={`fixed top-4 right-4 max-w-md p-4 rounded-lg shadow-lg flex items-start z-50 animate-slide-in-left ${
                         notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
                     }`}>
                         <div className="flex-1">{notification.message}</div>
@@ -230,7 +418,7 @@ function App() {
                         <h1 className="text-3xl font-bold mb-6 text-white">Dashboard</h1>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
+                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-100">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-medium text-white">Quick Actions</h3>
                                     <Phone className="text-blue-400"/>
@@ -244,7 +432,54 @@ function App() {
                                 </button>
                             </div>
 
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
+                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-medium text-white">My Agents</h3>
+                                    <Users className="text-blue-400"/>
+                                </div>
+                                {agents.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {agents.slice(0, 3).map((agent) => (
+                                            <div key={agent.id}
+                                                 className="flex items-center justify-between py-2 border-b border-gray-700">
+                                                <div>
+                                                    <div className="font-medium text-white">{agent.name}</div>
+                                                    <div className="text-sm text-gray-400">
+                                                        {agent.settings.voice} • {
+                                                        agent.settings.language_hint === 'hi' ? 'Hindi' :
+                                                            agent.settings.language_hint === 'en' ? 'English' : 'Marathi'
+                                                    }
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleEditAgent(agent.id)}
+                                                    className="text-sm px-2 py-1 bg-gray-700 text-blue-400 hover:bg-gray-600 rounded transition-colors"
+                                                >
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={() => setCurrentView('agents')}
+                                            className="text-blue-400 hover:text-blue-300 text-sm flex items-center mt-2"
+                                        >
+                                            View all agents
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-gray-400 mb-3">No agents created yet.</p>
+                                        <button
+                                            onClick={handleCreateAgent}
+                                            className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                                        >
+                                            Create Your First Agent
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-300">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-medium text-white">Recent Activity</h3>
                                     <Clock className="text-blue-400"/>
@@ -264,8 +499,8 @@ function App() {
                                                 <span className={`text-sm px-2 py-1 rounded-full ${
                                                     call.call_state === 'ANSWER' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'
                                                 }`}>
-                  {call.call_state}
-                </span>
+                                                    {call.call_state}
+                                                </span>
                                             </div>
                                         ))}
                                         <button
@@ -273,40 +508,11 @@ function App() {
                                             className="text-blue-400 hover:text-blue-300 text-sm flex items-center mt-2"
                                         >
                                             View all calls
-                                            <ChevronRight size={16}/>
                                         </button>
                                     </div>
                                 ) : (
                                     <p className="text-gray-400">No recent calls</p>
                                 )}
-                            </div>
-
-                            <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-medium text-white">System Status</h3>
-                                    <Activity className="text-blue-400"/>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm text-gray-400">Server</span>
-                                            <span className="text-sm text-green-400 font-medium">Online</span>
-                                        </div>
-                                        <div className="w-full bg-gray-700 rounded-full h-2">
-                                            <div className="bg-green-500 h-2 rounded-full w-full"></div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm text-gray-400">API Connection</span>
-                                            <span className="text-sm text-green-400 font-medium">Connected</span>
-                                        </div>
-                                        <div className="w-full bg-gray-700 rounded-full h-2">
-                                            <div className="bg-green-500 h-2 rounded-full w-full"></div>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -316,7 +522,27 @@ function App() {
                 {currentView === 'new-call' && (
                     <div className="p-6 text-gray-300">
                         <h1 className="text-3xl font-bold mb-6 text-white">Make a New Call</h1>
-                        <NewCallForm onSubmit={makeCall} loading={loading}/>
+                        <NewCallForm
+                            onSubmit={makeCall}
+                            loading={loading}
+                            agents={agents}
+                            selectedAgentId={selectedAgentId}
+                            onSelectAgent={handleSelectAgent}
+                            savedRecipients={savedRecipients}
+                        />
+                    </div>
+                )}
+
+                {/* Agent Form View */}
+                {currentView === 'agent-form' && (
+                    <div className="p-6 text-gray-300">
+                        <AgentForm
+                            agent={currentAgent}
+                            isEditing={isEditingAgent}
+                            onSave={handleSaveAgent}
+                            onCancel={() => setCurrentView('dashboard')}
+                            loading={loading}
+                        />
                     </div>
                 )}
 
@@ -400,9 +626,46 @@ function App() {
                                 </p>
                             </div>
                         </div>
+
+                        {/* Saved Recipients Management */}
+                        <div className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 mt-6">
+                            <h2 className="text-xl font-medium mb-4 text-white">Saved Recipients</h2>
+                            {savedRecipients.length > 0 ? (
+                                <div className="space-y-2">
+                                    {savedRecipients.map((recipient, index) => (
+                                        <div key={index}
+                                             className="flex items-center justify-between py-2 border-b border-gray-700">
+                                            <div className="font-medium text-white">{recipient}</div>
+                                            <button
+                                                onClick={() => {
+                                                    const newList = [...savedRecipients];
+                                                    newList.splice(index, 1);
+                                                    setSavedRecipients(newList);
+                                                }}
+                                                className="text-red-400 hover:text-red-300"
+                                            >
+                                                <X size={16}/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-gray-400">No recipients saved yet. Recipients will be automatically
+                                    saved when you make calls.</p>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
+
+            {/* Agent Selector Modal */}
+            <AgentSelector
+                isOpen={isAgentSelectorOpen}
+                onClose={() => setIsAgentSelectorOpen(false)}
+                agents={agents}
+                onSelectAgent={setSelectedAgentId}
+                onCreateNewAgent={handleCreateAgent}
+            />
         </div>
     );
 }
