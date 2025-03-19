@@ -9,7 +9,7 @@ import Sidebar from './components/Sidebar';
 import AgentForm from './components/AgentForm';
 import AgentSelector from './components/AgentSelector';
 import Analysis from './components/Analysis';
-
+import Dashboard from './components/Dashboard';
 // Generate a unique ID
 const generateId = () => `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -505,111 +505,14 @@ function App() {
 
                 {/* Dashboard View */}
                 {currentView === 'dashboard' && (
-                    <div className="p-6 text-gray-300">
-                        <h1 className="text-3xl font-bold mb-6 text-white">Dashboard</h1>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            <div
-                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-100">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-medium text-white">Quick Actions</h3>
-                                    <Phone className="text-blue-400"/>
-                                </div>
-                                <button
-                                    onClick={() => setCurrentView('new-call')}
-                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg flex items-center justify-center transition-colors"
-                                >
-                                    <Phone size={18} className="mr-2"/>
-                                    <span>Make a New Call</span>
-                                </button>
-                            </div>
-
-                            <div
-                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-200">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-medium text-white">My Agents</h3>
-                                    <Users className="text-blue-400"/>
-                                </div>
-                                {agents.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {agents.slice(0, 3).map((agent) => (
-                                            <div key={agent.id}
-                                                 className="flex items-center justify-between py-2 border-b border-gray-700">
-                                                <div>
-                                                    <div className="font-medium text-white">{agent.name}</div>
-                                                    <div className="text-sm text-gray-400">
-                                                        {agent.settings.voice} • {
-                                                        agent.settings.language_hint === 'hi' ? 'Hindi' :
-                                                            agent.settings.language_hint === 'en' ? 'English' : 'Marathi'
-                                                    }
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => handleEditAgent(agent.id)}
-                                                    className="text-sm px-2 py-1 bg-gray-700 text-blue-400 hover:bg-gray-600 rounded transition-colors"
-                                                >
-                                                    Edit
-                                                </button>
-                                            </div>
-                                        ))}
-                                        <button
-                                            onClick={() => setCurrentView('agents')}
-                                            className="text-blue-400 hover:text-blue-300 text-sm flex items-center mt-2"
-                                        >
-                                            View all agents
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <p className="text-gray-400 mb-3">No agents created yet.</p>
-                                        <button
-                                            onClick={handleCreateAgent}
-                                            className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
-                                        >
-                                            Create Your First Agent
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div
-                                className="bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-700 animate-fade-in animation-delay-300">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-medium text-white">Recent Activity</h3>
-                                    <Clock className="text-blue-400"/>
-                                </div>
-                                {loading ? (
-                                    <p className="text-gray-400">Loading recent calls...</p>
-                                ) : recentCalls.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {recentCalls.slice(0, 3).map((call, index) => (
-                                            <div key={index}
-                                                 className="flex items-center justify-between py-2 border-b border-gray-700">
-                                                <div>
-                                                    <div className="font-medium text-white">{call.to_number}</div>
-                                                    <div
-                                                        className="text-sm text-gray-400">{new Date(call.initiation_time).toLocaleString()}</div>
-                                                </div>
-                                                <span className={`text-sm px-2 py-1 rounded-full ${
-                                                    call.call_state === 'ANSWER' ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'
-                                                }`}>
-                                                    {call.call_state}
-                                                </span>
-                                            </div>
-                                        ))}
-                                        <button
-                                            onClick={() => setCurrentView('recent-calls')}
-                                            className="text-blue-400 hover:text-blue-300 text-sm flex items-center mt-2"
-                                        >
-                                            View all calls
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-400">No recent calls</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <Dashboard
+                        recentCalls={recentCalls}
+                        agents={agents}
+                        onCreateAgent={handleCreateAgent}
+                        onSelectAgent={handleSelectAgent}
+                        onViewDetails={viewCallDetails}
+                        setCurrentView={setCurrentView}
+                    />
                 )}
 
                 {/* New Call View */}
@@ -710,23 +613,12 @@ function App() {
 
                 {/* Call Analysis View */}
                 {currentView === 'call-analysis' && callAnalysisData && (
-                    <div className="p-6 text-gray-300">
-                        <h1 className="text-3xl font-bold mb-6 text-white">Call Analysis</h1>
-                        <Analysis
-                            callId={callAnalysisData.ultravoxCallId}
-                            callUuid={callAnalysisData.callUuid}
-                            onClose={() => setCurrentView('recent-calls')}
-                            serverStatus={serverStatus}
-                        />
-                        <div className="mt-4">
-                            <button
-                                onClick={() => setCurrentView('recent-calls')}
-                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                            >
-                                Back to Recent Calls
-                            </button>
-                        </div>
-                    </div>
+                    <Analysis
+                        callId={callAnalysisData.ultravoxCallId}
+                        callUuid={callAnalysisData.callUuid}
+                        onClose={() => setCurrentView('recent-calls')}
+                        serverStatus={serverStatus}
+                    />
                 )}
 
                 {/* Settings View */}

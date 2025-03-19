@@ -5,7 +5,47 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.0] - 2025-03-20
+## [1.3.1] - 2025-03-19
+
+### Added
+- Modern UI redesign with enhanced visual aesthetics
+- New color scheme with customizable primary, accent, and dark colors
+- Card and Button UI component system for consistent styling
+- Glass-morphism effects and gradient backgrounds
+- Improved typography with professional font pairings
+- Enhanced Dashboard with better statistical visualization
+- Redesigned Analysis component with tabbed interface
+- Modernized NewCallForm with improved recipient selection
+- Subtle animations and transitions throughout the interface
+- More intuitive layouts for call data visualization
+
+### Changed
+- Replaced flat design with depth through shadows and gradients
+- Updated iconography for better visual hierarchy
+- Improved error and empty state displays
+- Enhanced audio player interface in recording section
+- Better organization of analytics data
+- Refined color-coding system for call statuses
+- More responsive sidebar with mobile optimization
+
+### Fixed
+- "Waveform" icon compatibility issue with lucide-react
+- Card component styling inconsistencies
+- Button hover state transitions
+- Mobile layout display issues
+- Loading state indicators
+- Dropdown positioning in NewCallForm
+
+### Known Issues
+- Some icons may not appear correctly on older browsers
+- Font loading may cause slight layout shifts on initial page load
+- Audio player controls styling is inconsistent across browsers
+- Glass-morphism effects may impact performance on low-end devices
+- State management could be improved to reduce redundant API calls
+- Settings page is not yet updated to match new UI system
+- Dark mode toggle not yet implemented
+
+## [1.3.0] - 2025-03-19
 
 ### Added
 - Enhanced Analysis component to handle conversations of all sizes

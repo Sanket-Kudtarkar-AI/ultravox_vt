@@ -1,11 +1,11 @@
 ultravoxcalls/
 │
 ├── backend/
-│   ├── plivo_server.py            # Updated main Flask application
-│   ├── api_controller.py          # Updated API endpoints for Plivo
-│   ├── analysis_controller.py     # New controller for analysis features
-│   ├── utils.py                   # Utility functions (including get_join_url)
-│   ├── models.py                  # Database models including CallMapping
+│   ├── plivo_server.py            # Main Flask application
+│   ├── api_controller.py          # API endpoints for Plivo
+│   ├── analysis_controller.py     # Controller for analysis features
+│   ├── utils.py                   # Utility functions
+│   ├── models.py                  # Database models
 │   ├── database.py                # Database setup and session management
 │   ├── config.py                  # Configuration and constants
 │   ├── requirements.txt           # Python dependencies
@@ -13,26 +13,42 @@ ultravoxcalls/
 │
 ├── frontend/
 │   ├── public/
+│   │   ├── index.html             # Updated with modern fonts
+│   │   └── assets/                # Static assets
 │   ├── src/
-│   │   ├── App.jsx                # Updated with improved viewCallAnalysis
-│   │   ├── App.css
-│   │   ├── index.js
+│   │   ├── App.jsx                # Main application component with updated views
+│   │   ├── App.css                # Global styles
+│   │   ├── index.js               # Entry point
 │   │   ├── index.css              # Global styles with Tailwind
 │   │   ├── components/
-│   │   │   ├── Sidebar.jsx
-│   │   │   ├── AgentSelector.jsx
-│   │   │   ├── AgentForm.jsx
-│   │   │   ├── NewCallForm.jsx
-│   │   │   ├── CallStatus.jsx     # Updated to include Analysis button
-│   │   │   ├── CallDetails.jsx    # Updated to include Analysis button
-│   │   │   ├── RecentCalls.jsx    # Updated to include Analysis button
-│   │   │   └── Analysis.jsx       # New component for call analysis
+│   │   │   ├── Dashboard.jsx      # Modernized dashboard view
+│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with mobile responsiveness
+│   │   │   ├── AgentSelector.jsx  # Agent selection modal
+│   │   │   ├── AgentForm.jsx      # Agent creation/editing form
+│   │   │   ├── NewCallForm.jsx    # Modernized call form
+│   │   │   ├── CallStatus.jsx     # Call status view
+│   │   │   ├── CallDetails.jsx    # Call details view
+│   │   │   ├── RecentCalls.jsx    # Call history list
+│   │   │   ├── Analysis.jsx       # Enhanced call analysis component
+│   │   │   └── ui/                # New UI component library
+│   │   │       ├── Card.jsx       # Reusable card component
+│   │   │       ├── Button.jsx     # Styled button component
+│   │   │       ├── Input.jsx      # Form input component
+│   │   │       ├── Select.jsx     # Dropdown select component
+│   │   │       ├── Modal.jsx      # Reusable modal component
+│   │   │       ├── Badge.jsx      # Status badge component
+│   │   │       └── PageLayout.jsx # Consistent page layout component
 │   │   ├── utils/
-│   │   └── assets/
+│   │   │   ├── formatters.js      # Date and time formatting utilities
+│   │   │   └── api.js             # API client functions
+│   │   ├── contexts/
+│   │   │   └── ThemeContext.js    # Theme management (future)
+│   │   └── hooks/
+│   │       └── useApi.js          # Custom hook for API calls
 │   ├── package.json
-│   ├── tailwind.config.js
+│   ├── tailwind.config.js         # Updated with custom color scheme
 │   └── postcss.config.js
 │
 ├── README.md
-├── CHANGELOG.md
-└── debugging-guide.md             # New guide for troubleshooting
+├── CHANGELOG.md                   # Updated with v1.3.1 changes
+└── debugging-guide.md
