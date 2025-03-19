@@ -1,34 +1,63 @@
 import React from 'react';
-import { RefreshCw, Info, PhoneCall, BarChart } from 'lucide-react';
+import { RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import Card from './ui/Card';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 
 const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis }) => {
   // Helper function to format call status
   const getStatusBadge = (status) => {
     if (status === 'ANSWER') {
-      return <span className="bg-green-900 text-green-300 text-xs px-2 py-1 rounded-full">Completed</span>;
+      return <Badge variant="success" pill>
+        <div className="flex items-center">
+          <CheckCircle size={12} className="mr-1" />
+          Completed
+        </div>
+      </Badge>;
     } else if (status === 'BUSY') {
-      return <span className="bg-yellow-900 text-yellow-300 text-xs px-2 py-1 rounded-full">Busy</span>;
+      return <Badge variant="warning" pill>
+        <div className="flex items-center">
+          <AlertCircle size={12} className="mr-1" />
+          Busy
+        </div>
+      </Badge>;
     } else if (status === 'NO_ANSWER') {
-      return <span className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded-full">No Answer</span>;
+      return <Badge variant="default" pill>
+        <div className="flex items-center">
+          <XCircle size={12} className="mr-1" />
+          No Answer
+        </div>
+      </Badge>;
     } else if (status === 'FAILED') {
-      return <span className="bg-red-900 text-red-300 text-xs px-2 py-1 rounded-full">Failed</span>;
+      return <Badge variant="error" pill>
+        <div className="flex items-center">
+          <XCircle size={12} className="mr-1" />
+          Failed
+        </div>
+      </Badge>;
     } else {
-      return <span className="bg-blue-900 text-blue-300 text-xs px-2 py-1 rounded-full">{status}</span>;
+      return <Badge variant="info" pill>
+        <div className="flex items-center">
+          <Info size={12} className="mr-1" />
+          {status}
+        </div>
+      </Badge>;
     }
   };
 
   return (
-    <div className="bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-700">
-      <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+    <Card className="overflow-hidden">
+      <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
         <h2 className="text-xl font-semibold text-white">Call History</h2>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onRefresh}
           disabled={loading}
-          className="flex items-center px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-gray-300"
+          icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
         >
-          <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -45,7 +74,7 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-dark-700/50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">To</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">From</th>
@@ -55,9 +84,9 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700 bg-gray-800">
+            <tbody className="divide-y divide-dark-700">
               {calls.map((call, index) => (
-                <tr key={index} className="hover:bg-gray-700">
+                <tr key={index} className="bg-dark-800/30 hover:bg-dark-700/50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-white">{call.to_number}</div>
                   </td>
@@ -65,7 +94,8 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
                     <div className="text-sm text-gray-400">{call.from_number}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm text-gray-400 flex items-center">
+                      <Clock size={14} className="mr-1 text-primary-400" />
                       {new Date(call.initiation_time).toLocaleString()}
                     </div>
                   </td>
@@ -78,22 +108,24 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
                     {getStatusBadge(call.call_state)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end">
-                      <button
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => onViewDetails(call)}
-                        className="text-blue-400 hover:text-blue-300 flex items-center"
+                        icon={<Info size={14} />}
                       >
-                        <Info size={14} className="mr-1" />
                         Details
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => onViewAnalysis(call)}
-                        className="text-blue-400 hover:text-blue-300 flex items-center ml-3"
+                        icon={<BarChart size={14} />}
                       >
-                        <BarChart size={14} className="mr-1" />
                         Analysis
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -102,7 +134,7 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

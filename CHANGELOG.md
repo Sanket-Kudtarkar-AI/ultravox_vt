@@ -12,12 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New color scheme with customizable primary, accent, and dark colors
 - Card and Button UI component system for consistent styling
 - Glass-morphism effects and gradient backgrounds
+- New UI components: Input, Select, Modal, PageLayout components
 - Improved typography with professional font pairings
 - Enhanced Dashboard with better statistical visualization
 - Redesigned Analysis component with tabbed interface
 - Modernized NewCallForm with improved recipient selection
+- Standard PageLayout component for consistent UI structure
 - Subtle animations and transitions throughout the interface
 - More intuitive layouts for call data visualization
+- Improved Badge component with variants and options
+- Standardized notification system
 
 ### Changed
 - Replaced flat design with depth through shadows and gradients
@@ -27,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better organization of analytics data
 - Refined color-coding system for call statuses
 - More responsive sidebar with mobile optimization
+- Refactored App.jsx for cleaner component rendering
+- Updated CallDetails with improved information grouping
+- Redesigned CallStatus with better visual feedback
+- Enhanced RecentCalls with modern table styling
 
 ### Fixed
 - "Waveform" icon compatibility issue with lucide-react
@@ -35,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mobile layout display issues
 - Loading state indicators
 - Dropdown positioning in NewCallForm
+- Table overflow issues in RecentCalls component
+- Improved error handling in CallDetails component
 
 ### Known Issues
 - Some icons may not appear correctly on older browsers
@@ -42,7 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audio player controls styling is inconsistent across browsers
 - Glass-morphism effects may impact performance on low-end devices
 - State management could be improved to reduce redundant API calls
-- Settings page is not yet updated to match new UI system
 - Dark mode toggle not yet implemented
 
 ## [1.3.0] - 2025-03-19

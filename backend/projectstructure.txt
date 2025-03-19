@@ -16,7 +16,7 @@ ultravoxcalls/
 │   │   ├── index.html             # Updated with modern fonts
 │   │   └── assets/                # Static assets
 │   ├── src/
-│   │   ├── App.jsx                # Main application component with updated views
+│   │   ├── App.jsx                # Modernized main application component
 │   │   ├── App.css                # Global styles
 │   │   ├── index.js               # Entry point
 │   │   ├── index.css              # Global styles with Tailwind
@@ -26,18 +26,18 @@ ultravoxcalls/
 │   │   │   ├── AgentSelector.jsx  # Agent selection modal
 │   │   │   ├── AgentForm.jsx      # Agent creation/editing form
 │   │   │   ├── NewCallForm.jsx    # Modernized call form
-│   │   │   ├── CallStatus.jsx     # Call status view
-│   │   │   ├── CallDetails.jsx    # Call details view
-│   │   │   ├── RecentCalls.jsx    # Call history list
+│   │   │   ├── CallStatus.jsx     # Updated call status view
+│   │   │   ├── CallDetails.jsx    # Updated call details view
+│   │   │   ├── RecentCalls.jsx    # Updated call history list
 │   │   │   ├── Analysis.jsx       # Enhanced call analysis component
 │   │   │   └── ui/                # New UI component library
 │   │   │       ├── Card.jsx       # Reusable card component
 │   │   │       ├── Button.jsx     # Styled button component
-│   │   │       ├── Input.jsx      # Form input component
-│   │   │       ├── Select.jsx     # Dropdown select component
-│   │   │       ├── Modal.jsx      # Reusable modal component
+│   │   │       ├── Input.jsx      # Form input component (new)
+│   │   │       ├── Select.jsx     # Dropdown select component (new)
+│   │   │       ├── Modal.jsx      # Reusable modal component (new)
 │   │   │       ├── Badge.jsx      # Status badge component
-│   │   │       └── PageLayout.jsx # Consistent page layout component
+│   │   │       └── PageLayout.jsx # Consistent page layout component (new)
 │   │   ├── utils/
 │   │   │   ├── formatters.js      # Date and time formatting utilities
 │   │   │   └── api.js             # API client functions
