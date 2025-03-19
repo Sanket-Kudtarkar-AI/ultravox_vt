@@ -59,6 +59,7 @@ module.exports = {
                 'bounce-gentle': 'bounceGentle 1s infinite',
                 'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'glow': 'glow 1.5s ease-in-out infinite alternate',
+                'ripple': 'ripple 0.8s ease-out forwards',
             },
             keyframes: {
                 fadeIn: {
@@ -80,6 +81,10 @@ module.exports = {
                 glow: {
                     '0%': {textShadow: '0 0 2px #fff, 0 0 4px #fff, 0 0 6px currentColor'},
                     '100%': {textShadow: '0 0 4px #fff, 0 0 8px #fff, 0 0 12px currentColor'},
+                },
+                ripple: {
+                    '0%': { transform: 'scale(0)', opacity: '0.7' },
+                    '100%': { transform: 'scale(4)', opacity: '0' },
                 },
             },
             boxShadow: {

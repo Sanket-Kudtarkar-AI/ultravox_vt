@@ -29,9 +29,9 @@ const Sidebar = ({
   const [isAgentsExpanded, setIsAgentsExpanded] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Helper to get the status indicator color and text
+  // Helper to get the server status indicator color and text
   const getServerStatusInfo = () => {
-    switch(serverStatus) {
+    switch (serverStatus) {
       case 'online':
         return { color: 'bg-green-500', text: 'Online' };
       case 'offline':
@@ -43,22 +43,65 @@ const Sidebar = ({
 
   const statusInfo = getServerStatusInfo();
 
-  const NavItem = ({ icon, label, active, onClick, delay }) => (
-    <li className="animate-slide-in-left" style={{animationDelay: `${delay}ms`}}>
-      <button
-        onClick={onClick}
-        className={`
-          w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
-          ${active 
-            ? 'bg-gradient-to-r from-primary-900/50 to-primary-800/30 text-primary-400 font-medium'
-            : 'text-gray-400 hover:bg-dark-700/70 hover:text-white'}
-        `}
-      >
-        <div className="mr-3">{icon}</div>
-        <span>{label}</span>
-      </button>
-    </li>
-  );
+  // NavItem component that delays navigation to allow the pop animation to complete.
+  const NavItem = ({ icon, label, active, onClick, delay }) => {
+    const [pop, setPop] = useState(false);
+    const [ripple, setRipple] = useState({ active: false, x: 0, y: 0 });
+
+    const handleClick = (e) => {
+      // Calculate ripple position relative to button
+      const button = e.currentTarget;
+      const rect = button.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Activate ripple effect
+      setRipple({ active: true, x, y });
+      setPop(true);
+
+      // Delay navigation to let the animation play
+      setTimeout(() => {
+        onClick();
+      }, 400);
+    };
+
+    return (
+      <li style={{ animationDelay: `${delay}ms` }} className="relative overflow-hidden">
+        <button
+          onClick={handleClick}
+          onAnimationEnd={() => setPop(false)}
+          className={`
+            relative w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200 overflow-hidden
+            ${active
+              ? 'bg-gradient-to-r from-primary-900/50 to-primary-800/30 text-primary-400 font-medium'
+              : 'text-gray-400 hover:bg-dark-700/70 hover:text-white'
+            }
+            ${pop ? 'animate-pop-fancy' : ''}
+          `}
+        >
+          {/* Ripple effect */}
+          {ripple.active && (
+            <span
+              className="absolute animate-ripple rounded-full bg-white/20 pointer-events-none"
+              style={{
+                left: ripple.x + 'px',
+                top: ripple.y + 'px',
+                width: '120px',
+                height: '120px',
+                marginLeft: '-60px',
+                marginTop: '-60px',
+                transform: 'scale(0)',
+              }}
+              onAnimationEnd={() => setRipple({ active: false, x: 0, y: 0 })}
+            />
+          )}
+
+          <div className="mr-3 z-10">{icon}</div>
+          <span className="z-10">{label}</span>
+        </button>
+      </li>
+    );
+  };
 
   const renderNavigation = () => (
     <nav className="flex-1 overflow-y-auto py-4">
@@ -73,7 +116,7 @@ const Sidebar = ({
         />
 
         {/* Agents section with collapsible list */}
-        <li className="mt-6 animate-slide-in-left" style={{animationDelay: '100ms'}}>
+        <li className="mt-6" style={{ animationDelay: '100ms' }}>
           <div className="mb-2 flex items-center justify-between px-2 text-xs uppercase tracking-wider text-gray-500 font-semibold">
             <span>AGENTS</span>
             <button
@@ -101,19 +144,20 @@ const Sidebar = ({
           {isAgentsExpanded && (
             <ul className="pl-8 space-y-1 mt-1">
               {agents.length === 0 ? (
-                <li className="text-sm text-gray-500 py-1 px-3 animate-fade-in">
+                <li className="text-sm text-gray-500 py-1 px-3">
                   No agents created yet
                 </li>
               ) : (
                 agents.map((agent, index) => (
-                  <li key={agent.id} className="relative group animate-fade-in" style={{animationDelay: `${150 + index * 50}ms`}}>
+                  <li key={agent.id} className="relative group" style={{ animationDelay: `${150 + index * 50}ms` }}>
                     <button
                       onClick={() => onSelectAgent(agent.id)}
                       className={`
                         w-full text-left flex items-center py-1.5 px-3 text-sm rounded-lg transition-all duration-200
                         ${selectedAgentId === agent.id
                           ? 'bg-primary-900/40 text-primary-300'
-                          : 'text-gray-400 hover:bg-dark-700/50 hover:text-white'}
+                          : 'text-gray-400 hover:bg-dark-700/50 hover:text-white'
+                        }
                       `}
                     >
                       {agent.name}
@@ -160,7 +204,7 @@ const Sidebar = ({
         </li>
 
         {/* Calls section */}
-        <li className="mt-6 animate-slide-in-left" style={{animationDelay: '150ms'}}>
+        <li className="mt-6" style={{ animationDelay: '150ms' }}>
           <div className="mb-2 px-2 text-xs uppercase tracking-wider text-gray-500 font-semibold">
             CALLS
           </div>
@@ -183,7 +227,7 @@ const Sidebar = ({
         />
 
         {/* Settings section */}
-        <li className="mt-6 animate-slide-in-left" style={{animationDelay: '300ms'}}>
+        <li className="mt-6" style={{ animationDelay: '300ms' }}>
           <div className="mb-2 px-2 text-xs uppercase tracking-wider text-gray-500 font-semibold">
             SYSTEM
           </div>
@@ -212,18 +256,15 @@ const Sidebar = ({
         </button>
       </div>
 
-      {/* Mobile sidebar - slide in from left */}
+      {/* Mobile sidebar */}
       <div className={`
         lg:hidden fixed inset-0 z-40 transition-all duration-300 ease-in-out
         ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
       `}>
-        {/* Backdrop */}
         <div
           className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
-
-        {/* Sidebar */}
         <div className={`
           w-64 h-full bg-gradient-to-b from-dark-900 to-dark-950 shadow-xl overflow-hidden flex flex-col
           transition-transform duration-300
@@ -231,16 +272,13 @@ const Sidebar = ({
         `}>
           <div className="p-4 border-b border-dark-700">
             <div className="text-white text-xl font-bold flex items-center">
-              <Phone className="mr-2 text-primary-400"/>
-              <span>AI Call Manager</span>
+              <Phone className="mr-2 text-primary-400" />
+              <span>VT Call Manager</span>
             </div>
           </div>
-
           {renderNavigation()}
-
-          <div className="mt-auto p-4 border-t border-dark-700 animate-fade-in" style={{animationDelay: '400ms'}}>
+          <div className="mt-auto p-4 border-t border-dark-700" style={{ animationDelay: '400ms' }}>
             <div className="flex items-center text-sm text-gray-400">
-              {/* Status indicator */}
               <div className={`w-2 h-2 rounded-full mr-2 ${statusInfo.color} ${serverStatus === 'online' ? 'animate-pulse' : ''}`}></div>
               <span>Server Status: {statusInfo.text}</span>
             </div>
@@ -248,20 +286,17 @@ const Sidebar = ({
         </div>
       </div>
 
-      {/* Desktop sidebar - always visible on large screens */}
+      {/* Desktop sidebar */}
       <div className="hidden lg:flex bg-gradient-to-b from-dark-900 to-dark-950 w-64 flex-col border-r border-dark-700 shadow-lg">
         <div className="p-4 border-b border-dark-700">
           <div className="text-white text-xl font-bold flex items-center">
-            <Phone className="mr-2 text-primary-400"/>
-            <span>AI Call Manager</span>
+            <Phone className="mr-2 text-primary-400" />
+            <span>VT Call Manager</span>
           </div>
         </div>
-
         {renderNavigation()}
-
-        <div className="mt-auto p-4 border-t border-dark-700 animate-fade-in" style={{animationDelay: '400ms'}}>
+        <div className="mt-auto p-4 border-t border-dark-700" style={{ animationDelay: '400ms' }}>
           <div className="flex items-center text-sm text-gray-400">
-            {/* Status indicator */}
             <div className={`w-2 h-2 rounded-full mr-2 ${statusInfo.color} ${serverStatus === 'online' ? 'animate-pulse' : ''}`}></div>
             <span>Server Status: {statusInfo.text}</span>
           </div>

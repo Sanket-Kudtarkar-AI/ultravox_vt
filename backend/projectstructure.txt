@@ -17,27 +17,28 @@ ultravoxcalls/
 │   │   └── assets/                # Static assets
 │   ├── src/
 │   │   ├── App.jsx                # Modernized main application component
-│   │   ├── App.css                # Global styles
+│   │   ├── App.css                # Global styles with animations
 │   │   ├── index.js               # Entry point
-│   │   ├── index.css              # Global styles with Tailwind
+│   │   ├── index.css              # Global styles with custom scrollbar and Tailwind
 │   │   ├── components/
 │   │   │   ├── Dashboard.jsx      # Modernized dashboard view
-│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with mobile responsiveness
-│   │   │   ├── AgentSelector.jsx  # Agent selection modal
-│   │   │   ├── AgentForm.jsx      # Agent creation/editing form
+│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with ripple animations
+│   │   │   ├── AgentSelector.jsx  # Updated agent selection modal
+│   │   │   ├── AgentForm.jsx      # Modernized agent creation/editing form
 │   │   │   ├── NewCallForm.jsx    # Modernized call form
 │   │   │   ├── CallStatus.jsx     # Updated call status view
 │   │   │   ├── CallDetails.jsx    # Updated call details view
 │   │   │   ├── RecentCalls.jsx    # Updated call history list
 │   │   │   ├── Analysis.jsx       # Enhanced call analysis component
-│   │   │   └── ui/                # New UI component library
-│   │   │       ├── Card.jsx       # Reusable card component
-│   │   │       ├── Button.jsx     # Styled button component
-│   │   │       ├── Input.jsx      # Form input component (new)
-│   │   │       ├── Select.jsx     # Dropdown select component (new)
-│   │   │       ├── Modal.jsx      # Reusable modal component (new)
-│   │   │       ├── Badge.jsx      # Status badge component
-│   │   │       └── PageLayout.jsx # Consistent page layout component (new)
+│   │   │   └── ui/                # Comprehensive UI component library
+│   │   │       ├── Card.jsx       # Reusable card component with glass-morphism
+│   │   │       ├── Button.jsx     # Styled button component with variants
+│   │   │       ├── Input.jsx      # Form input component with glass effect
+│   │   │       ├── Select.jsx     # Dropdown select component with animations
+│   │   │       ├── Modal.jsx      # Reusable modal with backdrop blur
+│   │   │       ├── Badge.jsx      # Status badge component with variants
+│   │   │       ├── PageLayout.jsx # Consistent page layout component
+│   │   │       └── TabButton.jsx  # New tab navigation component
 │   │   ├── utils/
 │   │   │   ├── formatters.js      # Date and time formatting utilities
 │   │   │   └── api.js             # API client functions
@@ -46,9 +47,9 @@ ultravoxcalls/
 │   │   └── hooks/
 │   │       └── useApi.js          # Custom hook for API calls
 │   ├── package.json
-│   ├── tailwind.config.js         # Updated with custom color scheme
+│   ├── tailwind.config.js         # Updated with animations and effects
 │   └── postcss.config.js
 │
 ├── README.md
-├── CHANGELOG.md                   # Updated with v1.3.1 changes
+├── CHANGELOG.md                   # Updated with v1.4.0 changes
 └── debugging-guide.md

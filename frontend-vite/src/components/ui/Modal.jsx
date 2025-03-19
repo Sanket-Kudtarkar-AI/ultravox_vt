@@ -1,4 +1,3 @@
-// In components/ui/Modal.jsx
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
@@ -20,10 +19,14 @@ const Modal = ({
 
     if (isOpen) {
       window.addEventListener('keydown', handleEsc);
+      // Prevent body scrolling when modal is open
+      document.body.style.overflow = 'hidden';
     }
 
     return () => {
       window.removeEventListener('keydown', handleEsc);
+      // Restore body scrolling when modal is closed
+      document.body.style.overflow = 'auto';
     };
   }, [isOpen, onClose, closeOnEsc]);
 
@@ -49,11 +52,12 @@ const Modal = ({
       >
         {/* Header */}
         {title && (
-          <div className="flex justify-between items-center border-b border-dark-700 p-4">
+          <div className="flex justify-between items-center border-b border-dark-700 p-4 bg-dark-800/50 backdrop-blur-sm">
             <h2 className="text-xl font-semibold text-white">{title}</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-dark-700 transition-colors"
+              aria-label="Close"
             >
               <X size={20} />
             </button>
@@ -61,13 +65,13 @@ const Modal = ({
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {children}
         </div>
 
         {/* Footer with actions */}
         {actions && (
-          <div className="border-t border-dark-700 p-4 flex justify-end space-x-3">
+          <div className="border-t border-dark-700 p-4 flex justify-end space-x-3 bg-dark-800/30">
             {actions}
           </div>
         )}

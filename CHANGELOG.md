@@ -5,6 +5,41 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-03-21
+
+### Added
+- Material design ripple effect animations for sidebar navigation
+- Enhanced notification system with contextual styling and icons
+- Custom scrollbar styling for better UI consistency
+- Improved form components with glass-morphism effects
+- Subtle hover states and transitions throughout UI
+- TabButton component for consistent tab navigation
+- Animation delays for staggered loading effects
+- Group hover effects for interactive elements
+- Backdrop blur effects for modal and notification components
+- Better organized settings panel
+- New Input and Select components with improved accessibility
+
+### Changed
+- Improved AgentForm with modern styling and animations
+- Enhanced Modal component with body scroll locking
+- Refined input field styling with consistent hover effects
+- Updated notification system with gradient backgrounds
+- Improved form organization and visual hierarchy
+- Standardized icon usage across components
+- Made form animations more subtle and professional
+- Better organized inactivity message interface
+- Enhanced agent management UX with hover controls
+- Improved App.jsx structure with better component organization
+
+### Fixed
+- Notification closure logic to prevent clearing wrong notifications
+- Modal component z-indexing issues
+- Improved form validation styling
+- Fixed sidebar animation conflicts
+- Corrected scrolling behavior in modals
+- Added missing icon imports
+
 ## [1.3.1] - 2025-03-19
 
 ### Added

@@ -36,3 +36,51 @@ html, body, #root {
   flex-grow: 1;
   overflow: auto;
 }
+
+.nav-item-button {
+  transition: transform 0.3s ease-out;
+}
+
+.nav-item-button:active {
+  transform: scale(1.1);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-pop {
+  animation: pop 0.9s ease-out;
+}
+
+@keyframes popFancy {
+  0% {
+    transform: scale(1) translateY(0);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  20% {
+    transform: scale(1.02) translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  60% {
+    transform: scale(0.98) translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+.animate-pop-fancy {
+  animation: popFancy 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+

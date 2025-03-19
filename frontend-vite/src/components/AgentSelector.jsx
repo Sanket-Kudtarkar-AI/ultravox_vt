@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Phone, User, Check, Plus } from 'lucide-react';
+import { X, Search, Phone, User, Check, Plus, Mic } from 'lucide-react';
+import Button from './ui/Button';
 
 const AgentSelector = ({
   isOpen,
@@ -47,21 +48,21 @@ const AgentSelector = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 flex items-center justify-center">
-      <div className="bg-gray-800 rounded-xl shadow-lg w-full max-w-2xl border border-gray-700 max-h-[80vh] flex flex-col animate-fade-in">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in">
+      <div className="bg-gradient-to-b from-dark-800 to-dark-900 rounded-xl shadow-lg w-full max-w-2xl border border-dark-700 max-h-[80vh] flex flex-col animate-slide-in-up">
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-gray-700 p-4">
+        <div className="flex justify-between items-center border-b border-dark-700 p-4 bg-dark-800/50 backdrop-blur-sm">
           <h2 className="text-xl font-semibold text-white">Select an Agent</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-700 transition-colors"
+            className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-dark-700/70 transition-colors"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-gray-700">
+        <div className="p-4 border-b border-dark-700 bg-dark-800/30">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search size={18} className="text-gray-500" />
@@ -71,7 +72,7 @@ const AgentSelector = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search agents..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
+              className="w-full pl-10 pr-4 py-2 border border-dark-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-dark-700/70 text-white"
             />
           </div>
         </div>
@@ -79,42 +80,46 @@ const AgentSelector = ({
         {/* Agent List */}
         <div className="overflow-y-auto flex-grow">
           {filteredAgents.length === 0 ? (
-            <div className="p-8 text-center text-gray-400">
-              <Phone size={24} className="mx-auto mb-2" />
-              <p>{searchTerm ? 'No agents match your search' : 'No agents available'}</p>
-              <button
+            <div className="p-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-dark-700/50 text-primary-400 mb-4">
+                <Phone size={24} className="animate-pulse" />
+              </div>
+              <p className="text-gray-300 font-medium">{searchTerm ? 'No agents match your search' : 'No agents available'}</p>
+              <p className="text-gray-400 mt-1 mb-4">{searchTerm ? 'Try a different search term or create a new agent' : 'Create your first agent to get started'}</p>
+              <Button
                 onClick={handleCreateNewAgent}
-                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center mx-auto"
+                variant="primary"
+                size="md"
+                icon={<Plus size={16} />}
               >
-                <Plus size={16} className="mr-1" />
                 Create New Agent
-              </button>
+              </Button>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-700">
+            <ul className="divide-y divide-dark-700">
               {filteredAgents.map(agent => (
-                <li key={agent.id}>
+                <li key={agent.id} className="transition-all hover:bg-dark-700/30">
                   <button
                     onClick={() => {
                       onSelectAgent(agent.id);
                       onClose();
                     }}
-                    className="w-full px-4 py-3 hover:bg-gray-700 text-left transition-colors flex items-center"
+                    className="w-full px-4 py-3 text-left transition-colors flex items-center group"
                   >
-                    <div className="rounded-full bg-gray-700 p-2 mr-3">
-                      <User size={16} className="text-blue-400" />
+                    <div className="rounded-full bg-primary-900/30 p-2 mr-3 text-primary-400 group-hover:bg-primary-800/50 transition-colors">
+                      <Mic size={18} />
                     </div>
                     <div className="flex-grow">
-                      <h3 className="text-white font-medium">{agent.name}</h3>
-                      <p className="text-gray-400 text-sm">
+                      <h3 className="text-white font-medium group-hover:text-primary-200 transition-colors">{agent.name}</h3>
+                      <p className="text-gray-400 text-sm flex items-center">
                         {agent.settings.voice} • {
                           agent.settings.language_hint === 'hi' ? 'Hindi' :
                           agent.settings.language_hint === 'en' ? 'English' : 'Marathi'
                         }
                       </p>
                     </div>
-                    <div className="text-gray-400">
-                      <Check size={16} />
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-primary-400">
+                      <Check size={18} />
                     </div>
                   </button>
                 </li>
@@ -124,20 +129,22 @@ const AgentSelector = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-700 p-4 flex justify-between">
-          <button
+        <div className="border-t border-dark-700 p-4 flex justify-between bg-dark-800/20">
+          <Button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-600 text-gray-300 hover:text-white rounded-lg transition-colors"
+            variant="outline"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleCreateNewAgent}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center"
+            variant="primary"
+            size="md"
+            icon={<Plus size={16} />}
           >
-            <Plus size={16} className="mr-1" />
             Create New Agent
-          </button>
+          </Button>
         </div>
       </div>
     </div>

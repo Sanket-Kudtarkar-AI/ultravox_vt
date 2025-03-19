@@ -1,4 +1,3 @@
-// In components/ui/Input.jsx
 import React from 'react';
 
 const Input = ({
@@ -45,8 +44,10 @@ const Input = ({
             focus:ring-primary-500 focus:border-primary-500 
             bg-dark-700/70 
             text-white
+            backdrop-blur-sm
+            transition-all duration-200
             ${icon ? 'pl-10' : ''}
-            ${disabled ? 'opacity-60 cursor-not-allowed' : ''}
+            ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-dark-500'}
             ${className}
           `}
         />
