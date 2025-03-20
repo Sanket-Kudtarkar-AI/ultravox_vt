@@ -16,29 +16,29 @@ ultravoxcalls/
 │   │   ├── index.html             # Updated with modern fonts
 │   │   └── assets/                # Static assets
 │   ├── src/
-│   │   ├── App.jsx                # Modernized main application component
+│   │   ├── App.jsx                # Main application with mobile layout fixes
 │   │   ├── App.css                # Global styles with animations
 │   │   ├── index.js               # Entry point
 │   │   ├── index.css              # Global styles with custom scrollbar and Tailwind
 │   │   ├── components/
-│   │   │   ├── Dashboard.jsx      # Modernized dashboard view
-│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with ripple animations
-│   │   │   ├── AgentSelector.jsx  # Updated agent selection modal
-│   │   │   ├── AgentForm.jsx      # Modernized agent creation/editing form
-│   │   │   ├── NewCallForm.jsx    # Modernized call form
-│   │   │   ├── CallStatus.jsx     # Updated call status view
-│   │   │   ├── CallDetails.jsx    # Updated call details view
-│   │   │   ├── RecentCalls.jsx    # Updated call history list
-│   │   │   ├── Analysis.jsx       # Enhanced call analysis component
-│   │   │   └── ui/                # Comprehensive UI component library
-│   │   │       ├── Card.jsx       # Reusable card component with glass-morphism
-│   │   │       ├── Button.jsx     # Styled button component with variants
-│   │   │       ├── Input.jsx      # Form input component with glass effect
-│   │   │       ├── Select.jsx     # Dropdown select component with animations
-│   │   │       ├── Modal.jsx      # Reusable modal with backdrop blur
-│   │   │       ├── Badge.jsx      # Status badge component with variants
-│   │   │       ├── PageLayout.jsx # Consistent page layout component
-│   │   │       └── TabButton.jsx  # New tab navigation component
+│   │   │   ├── Dashboard.jsx      # Dashboard with fixed "View all calls" button
+│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with mobile layout fixes
+│   │   │   ├── AgentSelector.jsx  # Agent selection modal
+│   │   │   ├── AgentForm.jsx      # Agent form with expanded duration options
+│   │   │   ├── NewCallForm.jsx    # Improved call form with number dropdowns
+│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring
+│   │   │   ├── CallDetails.jsx    # Call details view
+│   │   │   ├── RecentCalls.jsx    # Call history with pagination
+│   │   │   ├── Analysis.jsx       # Call analysis component
+│   │   │   └── ui/                # UI component library
+│   │   │       ├── Card.jsx       # Reusable card component
+│   │   │       ├── Button.jsx     # Button component
+│   │   │       ├── Input.jsx      # Form input component
+│   │   │       ├── Select.jsx     # Dropdown select component
+│   │   │       ├── Modal.jsx      # Modal component
+│   │   │       ├── Badge.jsx      # Status badge component
+│   │   │       ├── PageLayout.jsx # Page layout component
+│   │   │       └── TabButton.jsx  # Tab navigation component
 │   │   ├── utils/
 │   │   │   ├── formatters.js      # Date and time formatting utilities
 │   │   │   └── api.js             # API client functions
@@ -51,5 +51,5 @@ ultravoxcalls/
 │   └── postcss.config.js
 │
 ├── README.md
-├── CHANGELOG.md                   # Updated with v1.4.0 changes
+├── CHANGELOG.md                   # Updated with v1.5.0 changes
 └── debugging-guide.md

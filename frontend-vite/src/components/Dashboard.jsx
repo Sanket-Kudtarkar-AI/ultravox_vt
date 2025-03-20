@@ -199,13 +199,16 @@ const Dashboard = ({ recentCalls, agents, onCreateAgent, onSelectAgent, onViewDe
                 </div>
               ))}
 
-              <button className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center mt-2">
+              <button
+                  className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center mt-2"
+                  onClick={() => setCurrentView('recent-calls')}
+              >
                 View all calls
-                <ArrowUpRight size={14} className="ml-1" />
+                <ArrowUpRight size={14} className="ml-1"/>
               </button>
             </div>
           ) : (
-            <p className="text-gray-400">No recent calls</p>
+              <p className="text-gray-400">No recent calls</p>
           )}
         </Card>
       </div>

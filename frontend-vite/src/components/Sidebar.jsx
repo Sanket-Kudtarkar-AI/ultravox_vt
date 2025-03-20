@@ -249,10 +249,11 @@ const Sidebar = ({
       {/* Mobile menu button - only visible on small screens */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-lg bg-dark-800 shadow-lg border border-dark-700"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 rounded-lg bg-dark-800 shadow-lg border border-dark-700"
+            style={{position: 'fixed', zIndex: 1000}}
         >
-          {isMobileMenuOpen ? <X size={24} className="text-gray-300" /> : <Menu size={24} className="text-gray-300" />}
+          {isMobileMenuOpen ? <X size={24} className="text-gray-300"/> : <Menu size={24} className="text-gray-300"/>}
         </button>
       </div>
 
@@ -262,7 +263,7 @@ const Sidebar = ({
         ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
       `}>
         <div
-          className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
         <div className={`

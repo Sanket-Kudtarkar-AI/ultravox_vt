@@ -9,7 +9,10 @@ const NewCallForm = ({
   agents,
   selectedAgentId,
   onSelectAgent,
-  savedRecipients = []
+  savedRecipients = [],
+  savedFromNumbers = [],
+  onRemoveRecipient,
+  onRemoveFromNumber
 }) => {
   const [formData, setFormData] = useState({
     recipient_phone_number: '',
@@ -19,13 +22,23 @@ const NewCallForm = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [recipientInput, setRecipientInput] = useState('');
   const [filteredRecipients, setFilteredRecipients] = useState([]);
+
+  // From number state
+  const [fromNumberInput, setFromNumberInput] = useState(formData.plivo_phone_number || '');
+  const [dropdownFromOpen, setDropdownFromOpen] = useState(false);
+  const [filteredFromNumbers, setFilteredFromNumbers] = useState([]);
+
   const dropdownRef = useRef(null);
+  const fromDropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
+      }
+      if (fromDropdownRef.current && !fromDropdownRef.current.contains(event.target)) {
+        setDropdownFromOpen(false);
       }
     }
 
@@ -34,6 +47,21 @@ const NewCallForm = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Initialize with default values from saved lists
+  useEffect(() => {
+    // Set default recipient to the most recently used one
+    if (savedRecipients.length > 0) {
+      setRecipientInput(savedRecipients[0]);
+      setFormData(prev => ({ ...prev, recipient_phone_number: savedRecipients[0] }));
+    }
+
+    // Set default from number to the most recently used one
+    if (savedFromNumbers.length > 0) {
+      setFromNumberInput(savedFromNumbers[0]);
+      setFormData(prev => ({ ...prev, plivo_phone_number: savedFromNumbers[0] }));
+    }
+  }, [savedRecipients, savedFromNumbers]);
 
   // Filter recipients based on input
   useEffect(() => {
@@ -46,6 +74,18 @@ const NewCallForm = ({
       setFilteredRecipients(savedRecipients);
     }
   }, [recipientInput, savedRecipients]);
+
+  // Filter from numbers based on input
+  useEffect(() => {
+    if (fromNumberInput) {
+      const filtered = savedFromNumbers.filter(number =>
+        number.includes(fromNumberInput)
+      );
+      setFilteredFromNumbers(filtered);
+    } else {
+      setFilteredFromNumbers(savedFromNumbers);
+    }
+  }, [fromNumberInput, savedFromNumbers]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,6 +107,23 @@ const NewCallForm = ({
     setFormData(prev => ({ ...prev, recipient_phone_number: recipient }));
     setRecipientInput(recipient);
     setDropdownOpen(false);
+  };
+
+  const handleFromNumberInputChange = (e) => {
+    const value = e.target.value;
+    setFromNumberInput(value);
+    setFormData(prev => ({ ...prev, plivo_phone_number: value }));
+    if (value && !dropdownFromOpen) {
+      setDropdownFromOpen(true);
+    } else if (!value) {
+      setDropdownFromOpen(false);
+    }
+  };
+
+  const selectFromNumber = (number) => {
+    setFormData(prev => ({ ...prev, plivo_phone_number: number }));
+    setFromNumberInput(number);
+    setDropdownFromOpen(false);
   };
 
   const handleSubmit = (e) => {
@@ -190,19 +247,28 @@ const NewCallForm = ({
                       <ul className="py-1">
                         {filteredRecipients.map((recipient, idx) => (
                           <li key={idx}>
-                            <button
-                              type="button"
-                              className="w-full text-left px-4 py-2 hover:bg-dark-600 text-white flex items-center justify-between transition-colors"
-                              onClick={() => selectRecipient(recipient)}
-                            >
-                              <div className="flex items-center">
+                            <div className="flex items-center justify-between px-4 py-2 hover:bg-dark-600 text-white">
+                              <button
+                                type="button"
+                                className="flex-grow text-left flex items-center transition-colors"
+                                onClick={() => selectRecipient(recipient)}
+                              >
                                 <User size={14} className="mr-2 text-gray-400"/>
                                 {recipient}
-                              </div>
-                              {recipient === recipientInput && (
-                                <Check size={14} className="text-green-500"/>
+                                {recipient === recipientInput && (
+                                  <Check size={14} className="ml-2 text-green-500"/>
+                                )}
+                              </button>
+                              {onRemoveRecipient && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRemoveRecipient(idx)}
+                                  className="text-gray-400 hover:text-red-400 p-1"
+                                >
+                                  <X size={14} />
+                                </button>
                               )}
-                            </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -214,21 +280,72 @@ const NewCallForm = ({
                 </p>
               </div>
 
-              {/* From Phone Number */}
-              <div>
+              {/* From Phone Number with Dropdown */}
+              <div className="relative" ref={fromDropdownRef}>
                 <label htmlFor="plivo_phone_number" className="block text-sm font-medium text-gray-300 mb-1">
                   From Phone Number*
                 </label>
-                <input
-                  id="plivo_phone_number"
-                  name="plivo_phone_number"
-                  type="text"
-                  required
-                  placeholder="+912231043958"
-                  value={formData.plivo_phone_number}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-dark-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-dark-700/70 text-white"
-                />
+                <div className="relative">
+                  <div className="flex">
+                    <input
+                      id="plivo_phone_number"
+                      type="text"
+                      required
+                      value={fromNumberInput}
+                      onChange={handleFromNumberInputChange}
+                      onClick={() => {
+                        if (savedFromNumbers.length > 0) {
+                          setDropdownFromOpen(true);
+                        }
+                      }}
+                      placeholder="+912231043958"
+                      className="w-full px-4 py-2 border border-dark-600 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-dark-700/70 text-white pr-10"
+                    />
+                    {savedFromNumbers.length > 0 && (
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400"
+                        onClick={() => setDropdownFromOpen(!dropdownFromOpen)}
+                      >
+                        <ChevronDown size={18} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* From Numbers Dropdown */}
+                  {dropdownFromOpen && filteredFromNumbers.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-dark-700 border border-dark-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                      <ul className="py-1">
+                        {filteredFromNumbers.map((number, idx) => (
+                          <li key={idx}>
+                            <div className="flex items-center justify-between px-4 py-2 hover:bg-dark-600 text-white">
+                              <button
+                                type="button"
+                                className="flex-grow text-left flex items-center transition-colors"
+                                onClick={() => selectFromNumber(number)}
+                              >
+                                <Phone size={14} className="mr-2 text-gray-400"/>
+                                {number}
+                                {number === fromNumberInput && (
+                                  <Check size={14} className="ml-2 text-green-500"/>
+                                )}
+                              </button>
+                              {onRemoveFromNumber && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRemoveFromNumber(idx)}
+                                  className="text-gray-400 hover:text-red-400 p-1"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-gray-400">
                   Enter your Plivo phone number with country code
                 </p>
@@ -249,7 +366,9 @@ const NewCallForm = ({
                     {selectedAgent.settings.max_duration === '60s' ? '1 minute' :
                       selectedAgent.settings.max_duration === '120s' ? '2 minutes' :
                         selectedAgent.settings.max_duration === '180s' ? '3 minutes' :
-                          selectedAgent.settings.max_duration === '240s' ? '4 minutes' : '5 minutes'}
+                          selectedAgent.settings.max_duration === '300s' ? '5 minutes' :
+                            selectedAgent.settings.max_duration === '480s' ? '8 minutes' :
+                              selectedAgent.settings.max_duration === '600s' ? '10 minutes' : '15 minutes'}
                   </span></p>
                 </div>
                 <div>

@@ -204,12 +204,15 @@ const AgentForm = ({
     {value: 'Ravi', label: 'Ravi (Male)'}
   ];
 
+  // Updated duration options to include more options
   const durationOptions = [
     {value: '60s', label: '1 minute'},
     {value: '120s', label: '2 minutes'},
     {value: '180s', label: '3 minutes'},
-    {value: '240s', label: '4 minutes'},
-    {value: '300s', label: '5 minutes'}
+    {value: '300s', label: '5 minutes'},
+    {value: '480s', label: '8 minutes'},
+    {value: '600s', label: '10 minutes'},
+    {value: '900s', label: '15 minutes'}
   ];
 
   const TabButton = ({ label, icon, isActive, onClick }) => (

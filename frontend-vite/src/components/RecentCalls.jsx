@@ -4,7 +4,17 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 
-const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis }) => {
+const RecentCalls = ({
+  calls,
+  loading,
+  onRefresh,
+  onViewDetails,
+  onViewAnalysis,
+  currentPage,
+  callsPerPage,
+  totalCalls,
+  paginate
+}) => {
   // Helper function to format call status
   const getStatusBadge = (status) => {
     if (status === 'ANSWER') {
@@ -44,6 +54,10 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
       </Badge>;
     }
   };
+
+  // Calculate pagination metrics
+  const indexOfFirstCall = (currentPage - 1) * callsPerPage;
+  const indexOfLastCall = Math.min(currentPage * callsPerPage, totalCalls);
 
   return (
     <Card className="overflow-hidden">
@@ -132,6 +146,43 @@ const RecentCalls = ({ calls, loading, onRefresh, onViewDetails, onViewAnalysis 
               ))}
             </tbody>
           </table>
+
+          {/* Pagination Controls */}
+          {calls.length > 0 && (
+            <div className="p-4 border-t border-dark-700 flex justify-between items-center">
+              <div className="text-sm text-gray-400">
+                Showing {indexOfFirstCall + 1} to {indexOfLastCall} of {totalCalls} calls
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: Math.ceil(totalCalls / callsPerPage) }).map((_, index) => (
+                  <Button
+                    key={index}
+                    variant={currentPage === index + 1 ? "primary" : "outline"}
+                    size="sm"
+                    onClick={() => paginate(index + 1)}
+                  >
+                    {index + 1}
+                  </Button>
+                )).slice(Math.max(0, currentPage - 3), Math.min(currentPage + 2, Math.ceil(totalCalls / callsPerPage)))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === Math.ceil(totalCalls / callsPerPage)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>

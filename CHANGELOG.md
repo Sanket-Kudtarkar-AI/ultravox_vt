@@ -5,6 +5,24 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-03-24
+
+### Added
+- Pagination in Call History with "Previous/Next" buttons
+- Default selection of previously used phone numbers in dropdowns
+- Delete buttons for saved phone numbers in dropdown lists
+- Extended call duration options (1, 2, 3, 5, 8, 10, 15 minutes)
+- Mobile layout improvements with proper spacing and z-index
+
+### Fixed
+- Mobile layout issues with sidebar menu overlap
+- "View all calls" button functionality in Dashboard
+- Call status updating every 500ms for real-time status
+
+### Changed
+- Improved phone number selection UX with better dropdown behavior
+- Enhanced number management with prioritization of recent numbers
+
 ## [1.4.0] - 2025-03-21
 
 ### Added

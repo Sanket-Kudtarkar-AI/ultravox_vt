@@ -37,11 +37,18 @@ function App() {
   // Call recipient history
   const [savedRecipients, setSavedRecipients] = useState([]);
 
+  // Call from number history
+  const [savedFromNumbers, setSavedFromNumbers] = useState([]);
+
   // Server status monitoring
   const [serverStatus, setServerStatus] = useState('unknown');
 
   // Call analysis state
   const [callAnalysisData, setCallAnalysisData] = useState(null);
+
+  // Pagination for call history
+  const [currentPage, setCurrentPage] = useState(1);
+  const [callsPerPage, setCallsPerPage] = useState(10);
 
   // API base URL - update this to your actual API endpoint
   const API_BASE_URL = 'http://localhost:5000/api';
@@ -61,9 +68,24 @@ function App() {
             const oldestAgent = [...parsedAgents].sort((a, b) =>
               new Date(a.created_at) - new Date(b.created_at)
             )[0];
-            setSelectedAgentId(oldestAgent.id);
+            if (oldestAgent) {
+              setSelectedAgentId(oldestAgent.id);
+            }
+          } else {
+            // Check if the selected agent still exists after reloading
+            const agentExists = parsedAgents.some(agent => agent.id === selectedAgentId);
+            if (!agentExists) {
+              // Reset selectedAgentId if the agent no longer exists
+              setSelectedAgentId(parsedAgents[0]?.id || null);
+            }
           }
+        } else {
+          // If no agents exist, ensure selectedAgentId is null
+          setSelectedAgentId(null);
         }
+      } else {
+        // If no agents are stored, ensure selectedAgentId is null
+        setSelectedAgentId(null);
       }
 
       // Load saved recipients with proper error handling
@@ -78,8 +100,22 @@ function App() {
           console.error('Error parsing saved recipients:', error);
         }
       }
+
+      // Load saved from numbers
+      const savedFromNumbersList = localStorage.getItem('fromNumbers');
+      if (savedFromNumbersList) {
+        try {
+          const parsedFromNumbers = JSON.parse(savedFromNumbersList);
+          if (Array.isArray(parsedFromNumbers)) {
+            setSavedFromNumbers(parsedFromNumbers);
+          }
+        } catch (error) {
+          console.error('Error parsing saved from numbers:', error);
+        }
+      }
     } catch (error) {
       console.error('Error loading saved data:', error);
+      setSelectedAgentId(null); // Reset on error
     }
   }, []);
 
@@ -104,6 +140,17 @@ function App() {
       console.error('Error saving recipients to localStorage:', error);
     }
   }, [savedRecipients]);
+
+  // Save from numbers to localStorage when they change
+  useEffect(() => {
+    try {
+      if (savedFromNumbers && savedFromNumbers.length > 0) {
+        localStorage.setItem('fromNumbers', JSON.stringify(savedFromNumbers));
+      }
+    } catch (error) {
+      console.error('Error saving from numbers to localStorage:', error);
+    }
+  }, [savedFromNumbers]);
 
   // Server status check
   const checkServerStatus = async () => {
@@ -172,10 +219,22 @@ function App() {
 
   const handleDeleteAgent = (agentId) => {
     if (window.confirm('Are you sure you want to delete this agent?')) {
-      setAgents(agents.filter(a => a.id !== agentId));
-      if (selectedAgentId === agentId) {
-        setSelectedAgentId(null);
-      }
+      setAgents(prevAgents => {
+        const updatedAgents = prevAgents.filter(a => a.id !== agentId);
+
+        // If we're deleting the currently selected agent
+        if (selectedAgentId === agentId) {
+          // Select another agent if available, otherwise set to null
+          if (updatedAgents.length > 0) {
+            setSelectedAgentId(updatedAgents[0].id);
+          } else {
+            setSelectedAgentId(null);
+          }
+        }
+
+        return updatedAgents;
+      });
+
       showNotification('success', 'Agent deleted successfully');
     }
   };
@@ -235,7 +294,7 @@ function App() {
   const fetchRecentCalls = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/recent_calls?limit=10`);
+      const response = await fetch(`${API_BASE_URL}/recent_calls?limit=20`); // Increased limit for pagination
       const data = await response.json();
 
       if (data.status === 'success') {
@@ -259,7 +318,8 @@ function App() {
       // Save recipient number if not already saved
       if (callData.recipient_phone_number && !savedRecipients.includes(callData.recipient_phone_number)) {
         setSavedRecipients(prev => {
-          const newRecipients = [...prev, callData.recipient_phone_number];
+          // Put the most recent at the beginning
+          const newRecipients = [callData.recipient_phone_number, ...prev.filter(r => r !== callData.recipient_phone_number)];
           // Immediately save to localStorage
           try {
             localStorage.setItem('recipients', JSON.stringify(newRecipients));
@@ -267,6 +327,26 @@ function App() {
             console.error('Error saving recipients to localStorage:', error);
           }
           return newRecipients;
+        });
+      } else if (callData.recipient_phone_number) {
+        // Move used number to front of the list
+        setSavedRecipients(prev => {
+          const newRecipients = [callData.recipient_phone_number, ...prev.filter(r => r !== callData.recipient_phone_number)];
+          localStorage.setItem('recipients', JSON.stringify(newRecipients));
+          return newRecipients;
+        });
+      }
+
+      // Save from number if not already saved or move to front if used
+      if (callData.plivo_phone_number) {
+        setSavedFromNumbers(prev => {
+          const newFromNumbers = [callData.plivo_phone_number, ...prev.filter(n => n !== callData.plivo_phone_number)];
+          try {
+            localStorage.setItem('fromNumbers', JSON.stringify(newFromNumbers));
+          } catch (error) {
+            console.error('Error saving from numbers to localStorage:', error);
+          }
+          return newFromNumbers;
         });
       }
 
@@ -434,11 +514,25 @@ function App() {
 
   // Display notification
   const showNotification = (type, message) => {
-    setNotification({type, message, id: Date.now()});
+    const notificationId = Date.now();
+    setNotification({type, message, id: notificationId});
     // Clear notification after 5 seconds
     setTimeout(() => {
-      setNotification(prev => prev && prev.id === notification.id ? null : prev);
+      setNotification(prev => prev && prev.id === notificationId ? null : prev);
     }, 5000);
+  };
+
+  // Handle pagination
+  const indexOfLastCall = currentPage * callsPerPage;
+  const indexOfFirstCall = indexOfLastCall - callsPerPage;
+  const currentCalls = recentCalls.slice(indexOfFirstCall, indexOfLastCall);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  // Show all calls
+  const handleViewAllCalls = () => {
+    setCurrentView('recent-calls');
   };
 
   // Render content based on current view
@@ -453,6 +547,7 @@ function App() {
             onSelectAgent={handleSelectAgent}
             onViewDetails={viewCallDetails}
             setCurrentView={setCurrentView}
+            onViewAllCalls={handleViewAllCalls}
           />
         );
 
@@ -469,6 +564,19 @@ function App() {
               selectedAgentId={selectedAgentId}
               onSelectAgent={handleSelectAgent}
               savedRecipients={savedRecipients}
+              savedFromNumbers={savedFromNumbers}
+              onRemoveRecipient={(index) => {
+                const newList = [...savedRecipients];
+                newList.splice(index, 1);
+                setSavedRecipients(newList);
+                localStorage.setItem('recipients', JSON.stringify(newList));
+              }}
+              onRemoveFromNumber={(index) => {
+                const newList = [...savedFromNumbers];
+                newList.splice(index, 1);
+                setSavedFromNumbers(newList);
+                localStorage.setItem('fromNumbers', JSON.stringify(newList));
+              }}
             />
           </PageLayout>
         );
@@ -520,11 +628,15 @@ function App() {
         return (
           <PageLayout title="Recent Calls" subtitle="View your call history">
             <RecentCalls
-              calls={recentCalls}
+              calls={currentCalls}
               loading={loading}
               onRefresh={fetchRecentCalls}
               onViewDetails={viewCallDetails}
               onViewAnalysis={viewCallAnalysis}
+              currentPage={currentPage}
+              callsPerPage={callsPerPage}
+              totalCalls={recentCalls.length}
+              paginate={paginate}
             />
           </PageLayout>
         );
@@ -597,6 +709,7 @@ function App() {
                             const newList = [...savedRecipients];
                             newList.splice(index, 1);
                             setSavedRecipients(newList);
+                            localStorage.setItem('recipients', JSON.stringify(newList));
                           }}
                         >
                           Remove
@@ -606,6 +719,39 @@ function App() {
                   </div>
                 ) : (
                   <p className="text-gray-400">No recipients saved yet. Recipients will be automatically
+                    saved when you make calls.</p>
+                )}
+              </div>
+
+              {/* Saved From Numbers Management */}
+              <div className="bg-dark-800/40 rounded-xl shadow-lg p-6 border border-dark-700">
+                <h2 className="text-xl font-medium mb-4 text-white">Saved From Numbers</h2>
+                {savedFromNumbers.length > 0 ? (
+                  <div className="space-y-2">
+                    {savedFromNumbers.map((number, index) => (
+                      <div key={index}
+                        className="flex items-center justify-between py-2 px-3 border-b border-dark-700 bg-dark-700/30 rounded-lg">
+                        <div className="font-medium text-white flex items-center">
+                          <Phone size={16} className="mr-2 text-primary-400" />
+                          {number}
+                        </div>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            const newList = [...savedFromNumbers];
+                            newList.splice(index, 1);
+                            setSavedFromNumbers(newList);
+                            localStorage.setItem('fromNumbers', JSON.stringify(newList));
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-400">No from numbers saved yet. From numbers will be automatically
                     saved when you make calls.</p>
                 )}
               </div>
@@ -686,37 +832,53 @@ function App() {
     );
   };
 
+  // Update call status more frequently in call-status view
+  useEffect(() => {
+    let interval;
+    if (currentView === 'call-status' && activeCall && activeCall.call_uuid) {
+      interval = setInterval(() => {
+        getCallStatus(activeCall.call_uuid);
+      }, 500); // Update every 500ms (0.5 seconds)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentView, activeCall]);
+
   return (
-    <div className="flex h-screen w-screen bg-gradient-to-b from-dark-900 to-dark-950 overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        currentView={currentView}
-        setCurrentView={setCurrentView}
-        agents={agents}
-        selectedAgentId={selectedAgentId}
-        onSelectAgent={handleSelectAgent}
-        onCreateAgent={handleCreateAgent}
-        onDeleteAgent={handleDeleteAgent}
-        onDuplicateAgent={handleDuplicateAgent}
-        onEditAgent={handleEditAgent}
-        serverStatus={serverStatus}
-      />
+      <div className="flex h-screen w-screen bg-gradient-to-b from-dark-900 to-dark-950 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar
+            currentView={currentView}
+            setCurrentView={setCurrentView}
+            agents={agents}
+            selectedAgentId={selectedAgentId}
+            onSelectAgent={handleSelectAgent}
+            onCreateAgent={handleCreateAgent}
+            onDeleteAgent={handleDeleteAgent}
+            onDuplicateAgent={handleDuplicateAgent}
+            onEditAgent={handleEditAgent}
+            serverStatus={serverStatus}
+        />
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto bg-gradient-to-b from-dark-900 to-dark-950 text-gray-200 custom-scrollbar">
-        {renderNotification()}
-        {renderContent()}
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto bg-gradient-to-b from-dark-900 to-dark-950 text-gray-200 custom-scrollbar">
+          <div className="lg:pl-0 pl-12">  {/* Add left padding on mobile to prevent overlap */}
+            {renderNotification()}
+            {renderContent()}
+          </div>
+        </div>
+
+        {/* Agent Selector Modal */}
+        <AgentSelector
+            isOpen={isAgentSelectorOpen}
+            onClose={() => setIsAgentSelectorOpen(false)}
+            agents={agents}
+            onSelectAgent={setSelectedAgentId}
+            onCreateNewAgent={handleCreateAgent}
+        />
       </div>
-
-      {/* Agent Selector Modal */}
-      <AgentSelector
-        isOpen={isAgentSelectorOpen}
-        onClose={() => setIsAgentSelectorOpen(false)}
-        agents={agents}
-        onSelectAgent={setSelectedAgentId}
-        onCreateNewAgent={handleCreateAgent}
-      />
-    </div>
   );
 }
 
