@@ -1,8 +1,9 @@
 import plivo
 import json
+import threading
+import time
 from flask import Blueprint, request, jsonify, current_app
 import logging
-import time
 from datetime import datetime
 
 from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT, DEFAULT_VAD_SETTINGS
@@ -171,9 +172,17 @@ def get_call_status(call_uuid):
             call_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
             if call_mapping:
                 ultravox_call_id = call_mapping.ultravox_call_id
-                logger.info(f"Found Ultravox call ID for {call_uuid}: {ultravox_call_id}")
+                # Only log this message once per minute per call_uuid
+                current_time = time.time()
+                last_log_time = getattr(get_call_status, f'last_log_time_{call_uuid}', 0)
+                if current_time - last_log_time > 60:  # Log once per minute
+                    logger.info(f"Found Ultravox call ID for {call_uuid}: {ultravox_call_id}")
+                    setattr(get_call_status, f'last_log_time_{call_uuid}', current_time)
             else:
-                logger.warning(f"No mapping found for call UUID: {call_uuid}")
+                # Only log this once per call_uuid
+                if not hasattr(get_call_status, f'logged_no_mapping_{call_uuid}'):
+                    logger.warning(f"No mapping found for call UUID: {call_uuid}")
+                    setattr(get_call_status, f'logged_no_mapping_{call_uuid}', True)
         except Exception as e:
             logger.error(f"Error fetching call mapping: {str(e)}")
         finally:
@@ -199,8 +208,19 @@ def get_call_status(call_uuid):
                 }
             })
         except plivo.exceptions.ResourceNotFoundError:
-            # If live call not found, try to get completed call details
-            logger.info(f"Live call not found for UUID {call_uuid}. Checking call history.")
+            # Only log this message once per call status check within a time period
+            if not hasattr(get_call_status, f'checked_history_{call_uuid}'):
+                logger.info(f"Live call not found for UUID {call_uuid}. Checking call history.")
+                setattr(get_call_status, f'checked_history_{call_uuid}', True)
+
+                # Reset after 5 minutes
+                def reset_flag():
+                    if hasattr(get_call_status, f'checked_history_{call_uuid}'):
+                        delattr(get_call_status, f'checked_history_{call_uuid}')
+
+                timer = threading.Timer(300, reset_flag)
+                timer.daemon = True
+                timer.start()
 
             try:
                 response = plivo_client.calls.get(call_uuid)
@@ -218,7 +238,8 @@ def get_call_status(call_uuid):
                         "end_time": response.end_time if hasattr(response, 'end_time') else None,
                         "from_number": response.from_number if hasattr(response, 'from_number') else None,
                         "to_number": response.to_number if hasattr(response, 'to_number') else None,
-                        "hangup_cause_name": response.hangup_cause_name if hasattr(response, 'hangup_cause_name') else None,
+                        "hangup_cause_name": response.hangup_cause_name if hasattr(response,
+                                                                                   'hangup_cause_name') else None,
                         "hangup_source": response.hangup_source if hasattr(response, 'hangup_source') else None,
                         "initiation_time": response.initiation_time if hasattr(response, 'initiation_time') else None
                     }

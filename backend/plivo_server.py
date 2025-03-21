@@ -3,6 +3,8 @@ from flask import Flask, Response, request, jsonify, current_app
 from datetime import datetime
 import json
 from flask_cors import CORS
+import logging
+import threading
 
 # Import from configuration and utilities
 from config import setup_logging, ULTRAVOX_API_BASE_URL, DEFAULT_VAD_SETTINGS, SYSTEM_PROMPT
@@ -11,6 +13,25 @@ from api_controller import api
 from analysis_controller import analysis
 from database import init_db, get_db_session, close_db_session
 from models import CallMapping
+
+# Create a filter to ignore frequent endpoint logs
+class EndpointFilter(logging.Filter):
+    def filter(self, record):
+        message = record.getMessage()
+        # Don't log status endpoint requests
+        if 'GET /status' in message or 'OPTIONS /status' in message:
+            return False
+        # Don't log routine call status checks
+        if 'GET /api/call_status/' in message:
+            return False
+        return True
+
+# Apply the filter to the Werkzeug logger
+logging.getLogger('werkzeug').addFilter(EndpointFilter())
+
+# Optionally, set Werkzeug logger to only show warnings and errors
+# Uncomment the line below if you want to further reduce log output
+# logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 # Set up logging
 logger = setup_logging("plivo_server", "plivo_server.log")
@@ -217,7 +238,7 @@ def status():
     """
     Simple status endpoint to check if server is running.
     """
-    logger.info("Status endpoint called")
+    # Note: We don't log status endpoint calls anymore
     return jsonify({
         "status": "Server is running",
         "timestamp": datetime.now().isoformat()

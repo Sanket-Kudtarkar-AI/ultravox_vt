@@ -94,23 +94,39 @@ function App() {
         try {
           const parsedRecipients = JSON.parse(savedRecipientsList);
           if (Array.isArray(parsedRecipients)) {
-            setSavedRecipients(parsedRecipients);
+            // Ensure we have unique values
+            const uniqueRecipients = Array.from(new Set(
+              parsedRecipients.map(num => num && typeof num === 'string' ? num.trim() : '')
+            )).filter(Boolean); // Remove any empty strings
+            setSavedRecipients(uniqueRecipients);
+          } else {
+            // If not an array, initialize with an empty array
+            setSavedRecipients([]);
           }
         } catch (error) {
           console.error('Error parsing saved recipients:', error);
+          setSavedRecipients([]);
         }
       }
 
-      // Load saved from numbers
+      // Load saved from numbers with proper error handling
       const savedFromNumbersList = localStorage.getItem('fromNumbers');
       if (savedFromNumbersList) {
         try {
           const parsedFromNumbers = JSON.parse(savedFromNumbersList);
           if (Array.isArray(parsedFromNumbers)) {
-            setSavedFromNumbers(parsedFromNumbers);
+            // Ensure we have unique values
+            const uniqueFromNumbers = Array.from(new Set(
+              parsedFromNumbers.map(num => num && typeof num === 'string' ? num.trim() : '')
+            )).filter(Boolean); // Remove any empty strings
+            setSavedFromNumbers(uniqueFromNumbers);
+          } else {
+            // If not an array, initialize with an empty array
+            setSavedFromNumbers([]);
           }
         } catch (error) {
           console.error('Error parsing saved from numbers:', error);
+          setSavedFromNumbers([]);
         }
       }
     } catch (error) {
@@ -315,37 +331,64 @@ function App() {
     try {
       setLoading(true);
 
-      // Save recipient number if not already saved
-      if (callData.recipient_phone_number && !savedRecipients.includes(callData.recipient_phone_number)) {
+      // Handle recipient number management
+      if (callData.recipient_phone_number) {
         setSavedRecipients(prev => {
-          // Put the most recent at the beginning
-          const newRecipients = [callData.recipient_phone_number, ...prev.filter(r => r !== callData.recipient_phone_number)];
-          // Immediately save to localStorage
+          // Normalize the number to prevent duplicates with different formatting
+          const normalizedNumber = callData.recipient_phone_number.trim();
+          const numberExists = prev.some(num => num.trim().toLowerCase() === normalizedNumber.toLowerCase());
+
+          // If it exists, filter it out before adding to the front
+          let newRecipients = numberExists
+            ? prev.filter(num => num.trim().toLowerCase() !== normalizedNumber.toLowerCase())
+            : [...prev];
+
+          // Add the new/used number to the front
+          newRecipients = [normalizedNumber, ...newRecipients];
+
+          // Limit the list to a reasonable size (e.g., 20 numbers)
+          if (newRecipients.length > 20) {
+            newRecipients = newRecipients.slice(0, 20);
+          }
+
+          // Save to localStorage safely
           try {
             localStorage.setItem('recipients', JSON.stringify(newRecipients));
           } catch (error) {
             console.error('Error saving recipients to localStorage:', error);
           }
-          return newRecipients;
-        });
-      } else if (callData.recipient_phone_number) {
-        // Move used number to front of the list
-        setSavedRecipients(prev => {
-          const newRecipients = [callData.recipient_phone_number, ...prev.filter(r => r !== callData.recipient_phone_number)];
-          localStorage.setItem('recipients', JSON.stringify(newRecipients));
+
           return newRecipients;
         });
       }
 
-      // Save from number if not already saved or move to front if used
+      // Handle "from" number management
       if (callData.plivo_phone_number) {
         setSavedFromNumbers(prev => {
-          const newFromNumbers = [callData.plivo_phone_number, ...prev.filter(n => n !== callData.plivo_phone_number)];
+          // Normalize the number to prevent duplicates
+          const normalizedNumber = callData.plivo_phone_number.trim();
+          const numberExists = prev.some(num => num.trim().toLowerCase() === normalizedNumber.toLowerCase());
+
+          // If it exists, filter it out before adding to the front
+          let newFromNumbers = numberExists
+            ? prev.filter(num => num.trim().toLowerCase() !== normalizedNumber.toLowerCase())
+            : [...prev];
+
+          // Add the new/used number to the front
+          newFromNumbers = [normalizedNumber, ...newFromNumbers];
+
+          // Limit the list to a reasonable size
+          if (newFromNumbers.length > 20) {
+            newFromNumbers = newFromNumbers.slice(0, 20);
+          }
+
+          // Save to localStorage safely
           try {
             localStorage.setItem('fromNumbers', JSON.stringify(newFromNumbers));
           } catch (error) {
             console.error('Error saving from numbers to localStorage:', error);
           }
+
           return newFromNumbers;
         });
       }
@@ -382,7 +425,7 @@ function App() {
           ...callData,
           call_uuid: data.call_uuid,
           ultravoxCallId: data.ultravox_call_id, // Store Ultravox call ID
-          status: 'initiated',
+          status: 'initiating', // More specific initial state
           timestamp: data.timestamp
         });
         setCurrentView('call-status');
@@ -407,12 +450,53 @@ function App() {
       const data = await response.json();
 
       if (data.status === 'success') {
+        // Get the previous status to check for state transitions
+        const prevStatus = activeCall ? activeCall.status : null;
+
+        // Determine the new status based on API response
+        let newStatus = 'initiating';
+
+        if (data.details) {
+          if (data.call_status === 'live' && data.details.call_status === 'in-progress') {
+            newStatus = 'in-progress';
+          } else if (data.details.call_state === 'ANSWER' ||
+                    data.details.hangup_cause_name === 'NORMAL_CLEARING') {
+            newStatus = 'completed';
+          } else if (data.details.call_state === 'BUSY') {
+            newStatus = 'busy';
+          } else if (data.details.call_state === 'FAILED') {
+            newStatus = 'failed';
+          } else if (data.details.call_state === 'NO_ANSWER') {
+            newStatus = 'no-answer';
+          } else if (data.call_status === 'live') {
+            newStatus = 'ringing'; // Specific state for ringing
+          }
+        }
+
+        // Set the updated call details
         setActiveCall(prev => ({
           ...prev,
           details: data.details,
           call_status: data.call_status,
+          status: newStatus, // Store our precise status
           lastUpdated: new Date().toISOString()
         }));
+
+        // Only show notifications on meaningful state transitions
+        if (prevStatus !== newStatus) {
+          if (newStatus === 'in-progress' && prevStatus !== 'completed') {
+            showNotification('success', 'Call is now in progress');
+          } else if (newStatus === 'completed' && prevStatus === 'in-progress') {
+            showNotification('success', 'Call completed successfully');
+          } else if (newStatus === 'busy') {
+            showNotification('warning', 'Recipient was busy');
+          } else if (newStatus === 'failed') {
+            showNotification('error', 'Call failed');
+          } else if (newStatus === 'no-answer') {
+            showNotification('warning', 'No answer from recipient');
+          }
+        }
+
         return data;
       } else {
         console.error('Error in call status response:', data.message);

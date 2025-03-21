@@ -5,6 +5,26 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-03-22
+
+### Added
+- More precise call status tracking with states "initiating", "ringing", "in-progress", etc.
+- Improved phone number management with normalization and duplicate prevention
+- Custom log filtering system to reduce terminal noise
+- Time-based message suppression for repetitive status checks
+
+### Fixed
+- Premature "completed" notifications during call ringing
+- Phone number list management issues in localStorage
+- Excessive logging in terminal for status endpoint calls and call status checks
+- Improved error handling in localStorage operations
+
+### Changed
+- Enhanced call status tracking with state transition notifications
+- Reduced log verbosity while maintaining functionality
+- Improved number list storage with validation and normalization
+- Limit saved phone numbers to reasonable list sizes (max 20)
+
 ## [1.5.0] - 2025-03-24
 
 ### Added
