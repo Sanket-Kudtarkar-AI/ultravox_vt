@@ -1,12 +1,13 @@
 import React, {useState, useEffect} from 'react';
-import {Phone, RefreshCw, Clock, AlertCircle, CheckCircle, PhoneOff, Info, Shield} from 'lucide-react';
+import {Phone, RefreshCw, Clock, AlertCircle, CheckCircle, PhoneOff, Info, Shield, BarChart} from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 
-const CallStatus = ({call, onRefreshStatus, loading}) => {
+const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [lastUpdated, setLastUpdated] = useState(new Date());
+    const [fetchingMapping, setFetchingMapping] = useState(false);
 
     // Auto refresh the status every 5 seconds if enabled
     useEffect(() => {
@@ -78,6 +79,59 @@ const CallStatus = ({call, onRefreshStatus, loading}) => {
             variant: 'warning',
             description: 'Call is being initiated'
         };
+    };
+
+    const handleViewAnalysis = () => {
+        // Always fetch the mapping before showing analysis
+        setFetchingMapping(true);
+
+        console.log("CallStatus: Fetching VT call ID mapping for", call.call_uuid);
+
+        fetch(`http://localhost:5000/api/call_mapping/${call.call_uuid}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Mapping API returned ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("CallStatus: Mapping API response:", data);
+
+                if (data.status === 'success' && data.mapping && data.mapping.ultravox_call_id) {
+                    // Create an enhanced call object with the correct VT call ID
+                    const enhancedCall = {
+                        ...call,
+                        // Use a different property name to avoid confusion
+                        vtCallId: data.mapping.ultravox_call_id
+                    };
+
+                    console.log("CallStatus: Passing to analysis with VT call ID:",
+                        data.mapping.ultravox_call_id);
+
+                    // Pass the enhanced call to the analysis view
+                    onViewAnalysis(enhancedCall);
+                } else {
+                    console.error("CallStatus: No valid mapping found in response:", data);
+                    // Pass the original call object if no mapping found
+                    onViewAnalysis({
+                        ...call,
+                        vtCallId: null, // Explicitly set to null to indicate mapping not found
+                        mappingError: "No valid VT call ID mapping found"
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("CallStatus: Error fetching VT call ID mapping:", err);
+                // Pass the original call with an error flag
+                onViewAnalysis({
+                    ...call,
+                    vtCallId: null,
+                    mappingError: `Error fetching mapping: ${err.message}`
+                });
+            })
+            .finally(() => {
+                setFetchingMapping(false);
+            });
     };
 
     const statusDisplay = getStatusDisplay();
@@ -195,17 +249,25 @@ const CallStatus = ({call, onRefreshStatus, loading}) => {
                             )}
                         </div>
 
-                        <div className="flex items-center bg-dark-700/30 p-3 px-4 rounded-lg border border-dark-600/40">
-                            <input
-                                type="checkbox"
-                                id="auto-refresh"
-                                checked={autoRefresh}
-                                onChange={(e) => setAutoRefresh(e.target.checked)}
-                                className="mr-2 bg-dark-700 border-dark-600 text-primary-600 focus:ring-primary-500 rounded"
-                            />
-                            <label htmlFor="auto-refresh" className="text-sm text-gray-300">
-                                Auto-refresh status every 5 seconds
-                            </label>
+                        {/* Add Analysis Button */}
+                        <div className="mt-4">
+                            <Button
+                                onClick={handleViewAnalysis}
+                                variant="primary"
+                                size="md"
+                                icon={<BarChart size={18} className="mr-2" />}
+                                fullWidth
+                                disabled={fetchingMapping}
+                            >
+                                {fetchingMapping ? (
+                                    <>
+                                        <RefreshCw size={18} className="mr-2 animate-spin" />
+                                        Preparing Analysis...
+                                    </>
+                                ) : (
+                                    <>View Call Analysis</>
+                                )}
+                            </Button>
                         </div>
                     </div>
                 </div>

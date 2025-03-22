@@ -5,6 +5,44 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+# Changelog
+
+All notable changes to the AI Voice Call System will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.7.0] - 2025-03-24
+
+### Added
+- Enhanced Analysis component with improved data refreshing capability
+- Better loading indicators throughout the application
+- Informative user messages when data isn't immediately available
+- Detailed console logging for debugging and monitoring
+- Additional pagination controls at the top of the Recent Calls table for better usability
+
+### Fixed
+- Critical issue with VT call ID mapping in Analysis feature
+- Fixed "Cannot access data before initialization" error in Analysis component
+- Corrected handling of 425 errors when recordings aren't immediately available
+- Fixed issue with Call Status analysis view showing only single message transcript
+- Ensured Analysis view retrieves complete transcript by using the correct VT call ID
+- Improved error handling throughout the application
+- Enhanced user messaging for situations when data isn't immediately available
+- Consolidated terminology by renaming "Ultravox Call ID" to "VT Call ID" throughout the UI
+
+### Changed
+- CallStatus component now directly fetches call mapping to ensure accuracy
+- Analysis button in Call Details moved to the header for better visibility
+- Improved component data flow to ensure consistent state across views
+- Enhanced API error handling with specific messages for different error types
+- Reduced UI noise by removing unnecessary auto-refresh checkbox
+- Set call history to display 20 calls per page for better readability
+- Updated project structure documentation
+- Added comprehensive logging throughout components for easier troubleshooting
+
+
 ## [1.6.0] - 2025-03-22
 
 ### Added

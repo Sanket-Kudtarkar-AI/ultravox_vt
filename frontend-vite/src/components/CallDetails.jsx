@@ -25,28 +25,38 @@ const CallDetails = ({ call, onRefreshStatus, loading, onViewAnalysis }) => {
     <Card className="overflow-hidden">
       <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
         <h2 className="text-xl font-semibold text-white">Call Details</h2>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onRefreshStatus}
-          disabled={loading}
-          icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
-        >
-          Refresh
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onViewAnalysis(call)}
+              icon={<BarChart size={14}/>}
+          >
+            Analysis
+          </Button>
+          <Button
+              variant="secondary"
+              size="sm"
+              onClick={onRefreshStatus}
+              disabled={loading}
+              icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''}/>}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="p-6">
         {/* Basic Call Information Section */}
         <div className="mb-8">
           <h3 className="text-lg font-medium mb-4 text-white flex items-center">
-            <Info size={18} className="mr-2 text-primary-400" />
+            <Info size={18} className="mr-2 text-primary-400"/>
             Basic Information
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
               <div className="flex items-start bg-dark-700/30 p-3 rounded-lg">
-                <Phone className="w-5 h-5 text-primary-400 mt-0.5 mr-3" />
+                <Phone className="w-5 h-5 text-primary-400 mt-0.5 mr-3"/>
                 <div>
                   <div className="text-sm text-gray-400">Call UUID</div>
                   <div className="font-medium break-all text-white">{call.call_uuid}</div>
@@ -57,7 +67,7 @@ const CallDetails = ({ call, onRefreshStatus, loading, onViewAnalysis }) => {
               <div className="flex items-start bg-dark-700/30 p-3 rounded-lg">
                 <User className="w-5 h-5 text-primary-400 mt-0.5 mr-3" />
                 <div>
-                  <div className="text-sm text-gray-400">Ultravox Call ID</div>
+                  <div className="text-sm text-gray-400">VT Call ID</div>
                   <div className="font-medium break-all text-white">
                     {call.ultravox_call_id || 'N/A'}
                   </div>

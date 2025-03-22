@@ -16,6 +16,8 @@ import {
     XCircle,
     AlertTriangle
 } from 'lucide-react';
+import Button from './ui/Button';
+
 
 const TabButton = ({active, icon, label, onClick}) => (
     <button
@@ -38,7 +40,8 @@ const StatCard = ({title, value, className = ""}) => (
     </div>
 );
 
-const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
+// Rename callId to ultravoxCallId in the props for clarity
+const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => {
     const [activeTab, setActiveTab] = useState('transcription');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -49,91 +52,173 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
     const [audioTime, setAudioTime] = useState(0);
     const audioRef = React.useRef(null);
 
+    console.log("==================== ANALYSIS COMPONENT DEBUG ====================");
+    console.log("Received props - callId:", ultravoxCallId, "callUuid:", callUuid);
+
     // Check if Ultravox data is available
-    const ultravoxDataAvailable = !!callId;
+    const ultravoxDataAvailable = !!ultravoxCallId;
 
     // API base URL - update this to your actual API endpoint
     const API_BASE_URL = 'http://localhost:5000/api';
 
-    // Fetch call transcription on component mount
+    // Add a refresh all data function
+    const refreshAllData = () => {
+        if (ultravoxCallId) {
+            setLoading(true);
+
+            // Track success of all operations
+            let successCount = 0;
+            let totalOperations = ultravoxDataAvailable ? 3 : 0;
+
+            const finishOperation = (success) => {
+                if (success) successCount++;
+                if (--totalOperations <= 0) {
+                    setLoading(false);
+                    if (successCount > 0) {
+                        // If at least one operation succeeded, show a success message
+                        console.log("Data refreshed successfully");
+                    }
+                }
+            };
+
+            if (ultravoxDataAvailable) {
+                // Fetch transcription
+                fetchTranscription()
+                    .then(() => finishOperation(true))
+                    .catch(() => finishOperation(false));
+
+                // Fetch recording URL
+                fetchRecordingUrl()
+                    .then(() => finishOperation(true))
+                    .catch(() => finishOperation(false));
+
+                // Fetch analytics
+                fetchAnalytics()
+                    .then(() => finishOperation(true))
+                    .catch(() => finishOperation(false));
+            } else {
+                setLoading(false);
+            }
+        }
+    };
+
+    // Fetch call data on component mount
     useEffect(() => {
-        if (callId && serverStatus === 'online') {
+        if (ultravoxCallId && serverStatus === 'online') {
+            console.log("Fetching data with ultravoxCallId:", ultravoxCallId); // Add debug logging
             fetchTranscription();
             fetchRecordingUrl();
             fetchAnalytics();
         }
-    }, [callId, serverStatus]);
+    }, [ultravoxCallId, serverStatus]);
 
-    // Fetch call transcription
+    // Fetch call transcription - return a promise for better control
     const fetchTranscription = async () => {
-        if (!ultravoxDataAvailable) return;
+  if (!ultravoxDataAvailable) return Promise.resolve();
 
-        try {
-            setLoading(true);
-            setError(null);
+  try {
+    setLoading(true);
+    setError(null);
+    console.log("ANALYSIS COMPONENT - Fetching transcription with Ultravox ID:", ultravoxCallId);
 
-            const response = await fetch(`${API_BASE_URL}/call_transcription/${callId}`);
+    // Make the API request
+    const response = await fetch(`${API_BASE_URL}/call_transcription/${ultravoxCallId}`);
+    console.log("ANALYSIS COMPONENT - Transcription response status:", response.status);
 
-            if (!response.ok) {
-                throw new Error(`Error fetching transcription: ${response.status}`);
-            }
+    // Check response status
+    if (!response.ok) {
+      console.error(`ANALYSIS COMPONENT - Error response: ${response.status} ${response.statusText}`);
+      throw new Error(`Error fetching transcription: ${response.status}`);
+    }
 
-            const data = await response.json();
+    // Parse the JSON response BEFORE trying to access any properties
+    const responseData = await response.json();
 
-            if (data.status === 'success' && data.results) {
-                setTranscription(data.results);
-            } else {
-                setError(data.message || 'Failed to fetch transcription');
-            }
-        } catch (err) {
-            setError(`Error: ${err.message}`);
-            console.error('Error fetching transcription:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Now we can safely log and use the data
+    console.log("ANALYSIS COMPONENT - Transcription data received");
 
-    // Fetch recording URL
+    if (responseData.status === 'success' && responseData.results) {
+      console.log("ANALYSIS COMPONENT - Number of messages:", responseData.results.length);
+      setTranscription(responseData.results);
+      return Promise.resolve(true);
+    } else {
+      setError(responseData.message || 'Failed to fetch transcription');
+      return Promise.reject(responseData.message || 'Failed to fetch transcription');
+    }
+  } catch (err) {
+    setError(`Error: ${err.message}`);
+    console.error('ANALYSIS COMPONENT - Error fetching transcription:', err);
+    return Promise.reject(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+    // Fetch recording URL - return a promise for better control
     const fetchRecordingUrl = async () => {
-        if (!ultravoxDataAvailable) return;
+  if (!ultravoxDataAvailable) return Promise.resolve();
 
-        try {
-            const response = await fetch(`${API_BASE_URL}/call_recording/${callId}`);
+  try {
+    console.log("ANALYSIS COMPONENT - Fetching recording URL with Ultravox ID:", ultravoxCallId);
 
-            if (!response.ok) {
-                console.error(`Error fetching recording URL: ${response.status}`);
-                return;
-            }
+    const response = await fetch(`${API_BASE_URL}/call_recording/${ultravoxCallId}`);
+    console.log("ANALYSIS COMPONENT - Recording URL response status:", response.status);
 
-            const data = await response.json();
+    if (!response.ok) {
+      // Handle specific status codes
+      if (response.status === 425) {
+        console.warn("ANALYSIS COMPONENT - Recording not ready yet (425 Too Early)");
+        return Promise.reject("Recording not ready yet. Please try refreshing in a few moments.");
+      } else {
+        console.error(`ANALYSIS COMPONENT - Error fetching recording URL: ${response.status}`);
+        return Promise.reject(`Error fetching recording URL: ${response.status}`);
+      }
+    }
 
-            if (data.status === 'success' && data.url) {
-                setRecordingUrl(data.url);
-            }
-        } catch (err) {
-            console.error('Error fetching recording URL:', err);
-        }
-    };
+    // Parse the JSON response
+    const responseData = await response.json();
+    console.log("ANALYSIS COMPONENT - Recording URL response data:", responseData);
 
-    // Fetch call analytics
+    if (responseData.status === 'success' && responseData.url) {
+      console.log("ANALYSIS COMPONENT - Successfully retrieved recording URL");
+      setRecordingUrl(responseData.url);
+      return Promise.resolve(true);
+    } else {
+      console.warn("ANALYSIS COMPONENT - No URL in recording response:", responseData);
+      return Promise.reject(responseData.message || 'No recording URL available');
+    }
+  } catch (err) {
+    console.error('ANALYSIS COMPONENT - Error fetching recording URL:', err);
+    return Promise.reject(err.message || "Failed to fetch recording URL");
+  }
+};
+
+    // Fetch call analytics - return a promise for better control
     const fetchAnalytics = async () => {
-        if (!ultravoxDataAvailable) return;
+        if (!ultravoxDataAvailable) return Promise.resolve();
 
         try {
-            const response = await fetch(`${API_BASE_URL}/call_analytics/${callId}/${callUuid}`);
+            console.log("Fetching analytics for call ID:", ultravoxCallId, "and call UUID:", callUuid);
+            const response = await fetch(`${API_BASE_URL}/call_analytics/${ultravoxCallId}/${callUuid}`);
+            console.log("Analytics response status:", response.status);
 
             if (!response.ok) {
                 console.error(`Error fetching analytics: ${response.status}`);
-                return;
+                return Promise.reject(`Error fetching analytics: ${response.status}`);
             }
 
             const data = await response.json();
+            console.log("Analytics data:", data);
 
             if (data.status === 'success') {
                 setAnalytics(data.analytics);
+                return Promise.resolve(true);
+            } else {
+                return Promise.reject(data.message || 'Failed to fetch analytics');
             }
         } catch (err) {
             console.error('Error fetching analytics:', err);
+            return Promise.reject(err);
         }
     };
 
@@ -302,12 +387,12 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                 </div>
                 <div className="flex items-center space-x-2">
                     <button
-                        onClick={fetchTranscription}
+                        onClick={refreshAllData}
                         disabled={loading || serverStatus !== 'online' || !ultravoxDataAvailable}
-                        className="flex items-center px-3 py-1.5 text-sm bg-dark-700 hover:bg-dark-600 rounded-lg transition-colors text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`}/>
-                        Refresh
+                        Refresh Data
                     </button>
                 </div>
             </div>
@@ -318,9 +403,9 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                         className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-900/30 text-yellow-400 mb-4">
                         <AlertTriangle size={32}/>
                     </div>
-                    <p className="text-lg font-medium mb-2 text-white">Ultravox data mapping not found</p>
+                    <p className="text-lg font-medium mb-2 text-white">VT call ID mapping not found</p>
                     <p className="text-sm text-gray-400 max-w-md mx-auto">
-                        The system couldn't find a mapping between this call and its Ultravox data.
+                        The system couldn't find a mapping between this call and its VT call ID.
                         This may happen for calls made before the analysis feature was implemented.
                     </p>
                     <p className="text-sm mt-4 text-gray-500">
@@ -384,6 +469,14 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                                             Note: Transcription may take a few minutes to become available after call
                                             completion.
                                         </p>
+                                        <Button
+                                            onClick={refreshAllData}
+                                            variant="primary"
+                                            className="mt-4"
+                                            icon={<RefreshCw size={16}/>}
+                                        >
+                                            Refresh Data
+                                        </Button>
                                     </div>
                                 ) : transcription.length === 0 ? (
                                     <div className="p-12 text-center">
@@ -395,8 +488,16 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                                             available</p>
                                         <p className="text-sm text-gray-400 max-w-md mx-auto">
                                             Transcription may take a few minutes to become available after call
-                                            completion.
+                                            completion. Please refresh the data to check if it's ready.
                                         </p>
+                                        <Button
+                                            onClick={refreshAllData}
+                                            variant="primary"
+                                            className="mt-4"
+                                            icon={<RefreshCw size={16}/>}
+                                        >
+                                            Refresh Data
+                                        </Button>
                                     </div>
                                 ) : (
                                     <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
@@ -469,6 +570,14 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                                         <p className="text-sm text-gray-400 max-w-md mx-auto">
                                             Recordings may take a few minutes to become available after call completion.
                                         </p>
+                                        <Button
+                                            onClick={refreshAllData}
+                                            variant="primary"
+                                            className="mt-4"
+                                            icon={<RefreshCw size={16}/>}
+                                        >
+                                            Refresh Data
+                                        </Button>
                                     </div>
                                 ) : (
                                     <div className="bg-dark-800/50 backdrop-blur-sm p-6 rounded-lg">
@@ -518,273 +627,295 @@ const Analysis = ({callId, callUuid, onClose, serverStatus}) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                    <StatCard
-                                        title="Total Messages"
-                                        value={stats.totalMessages}
-                                    />
-                                    <StatCard
-                                        title="Call Duration"
-                                        value={formatDuration(stats.totalDuration)}
-                                    />
-                                    <StatCard
-                                        title="Message Ratio"
-                                        value={`${stats.agentMessages}:${stats.userMessages}`}
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                    <StatCard
-                                        title="Avg. Agent Response Length"
-                                        value={`${stats.avgAgentResponseLength} chars`}
-                                        className="bg-primary-900/20"
-                                    />
-                                    <StatCard
-                                        title="Avg. User Response Length"
-                                        value={`${stats.avgUserResponseLength} chars`}
-                                        className="bg-dark-700/70"
-                                    />
-                                </div>
-
-                                {stats.messagesWithoutText > 0 && (
-                                    <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
-                                        <div className="text-gray-400 text-sm mb-1">Voice-only Inputs</div>
+                                {!analytics ? (
+                                    <div className="p-12 text-center">
                                         <div
-                                            className="text-2xl font-bold text-white">{stats.messagesWithoutText} messages
+                                            className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-dark-700/50 text-gray-400 mb-4">
+                                            <BarChart size={32}/>
                                         </div>
-                                        <div className="text-sm text-gray-400 mt-1">
-                                            These are voice inputs without transcribed text
-                                        </div>
+                                        <p className="text-lg font-medium mb-2 text-white">Analytics not available</p>
+                                        <p className="text-sm text-gray-400 max-w-md mx-auto">
+                                            Analytics may take a few minutes to become available after call completion.
+                                        </p>
+                                        <Button
+                                            onClick={refreshAllData}
+                                            variant="primary"
+                                            className="mt-4"
+                                            icon={<RefreshCw size={16}/>}
+                                        >
+                                            Refresh Data
+                                        </Button>
                                     </div>
-                                )}
-
-                                {/* Duration sources */}
-                                <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
-                                    <h4 className="font-medium text-white mb-2">Duration Details</h4>
-                                    <div className="text-sm text-gray-300">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="mb-1">
-                                                    <span
-                                                        className="text-gray-400">Calculated:</span> {formatDuration(stats.totalDuration)}
-                                                </p>
-                                                {analytics?.plivo?.call_duration && (
-                                                    <p className="mb-1">
-                                                        <span
-                                                            className="text-gray-400">Plivo:</span> {formatDuration(analytics.plivo.call_duration)}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div>
-                                                {analytics?.ultravox?.created && analytics?.ultravox?.ended && (
-                                                    <p className="mb-1">
-                                                        <span className="text-gray-400">Ultravox:</span> {
-                                                        formatDuration(
-                                                            Math.round(
-                                                                (new Date(analytics.ultravox.ended) -
-                                                                    new Date(analytics.ultravox.created)) / 1000
-                                                            )
-                                                        )
-                                                    }
-                                                    </p>
-                                                )}
-                                                {analytics?.combined?.total_duration && (
-                                                    <p className="mb-1">
-                                                        <span
-                                                            className="text-gray-400">Combined:</span> {formatDuration(analytics.combined.total_duration)}
-                                                    </p>
-                                                )}
-                                            </div>
+                                ) : (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                            <StatCard
+                                                title="Total Messages"
+                                                value={stats.totalMessages}
+                                            />
+                                            <StatCard
+                                                title="Call Duration"
+                                                value={formatDuration(stats.totalDuration)}
+                                            />
+                                            <StatCard
+                                                title="Message Ratio"
+                                                value={`${stats.agentMessages}:${stats.userMessages}`}
+                                            />
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Message Statistics */}
-                                {transcription.length > 0 && (
-                                    <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
-                                        <h4 className="font-medium text-white mb-2">Message Statistics</h4>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                            <div className="bg-dark-800/50 p-3 rounded-lg">
-                                                <p className="text-xs text-gray-400">Agent Messages</p>
-                                                <p className="text-lg font-bold text-white">{stats.agentMessages}</p>
-                                            </div>
-                                            <div className="bg-dark-800/50 p-3 rounded-lg">
-                                                <p className="text-xs text-gray-400">User Messages</p>
-                                                <p className="text-lg font-bold text-white">{stats.userMessages}</p>
-                                            </div>
-                                            <div className="bg-dark-800/50 p-3 rounded-lg">
-                                                <p className="text-xs text-gray-400">Agent Response %</p>
-                                                <p className="text-lg font-bold text-white">
-                                                    {stats.totalMessages > 0
-                                                        ? Math.round((stats.agentMessages / stats.totalMessages) * 100)
-                                                        : 0}%
-                                                </p>
-                                            </div>
-                                            <div className="bg-dark-800/50 p-3 rounded-lg">
-                                                <p className="text-xs text-gray-400">Voice-only %</p>
-                                                <p className="text-lg font-bold text-white">
-                                                    {stats.totalMessages > 0
-                                                        ? Math.round((stats.messagesWithoutText / stats.totalMessages) * 100)
-                                                        : 0}%
-                                                </p>
-                                            </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                            <StatCard
+                                                title="Avg. Agent Response Length"
+                                                value={`${stats.avgAgentResponseLength} chars`}
+                                                className="bg-primary-900/20"
+                                            />
+                                            <StatCard
+                                                title="Avg. User Response Length"
+                                                value={`${stats.avgUserResponseLength} chars`}
+                                                className="bg-dark-700/70"
+                                            />
                                         </div>
-                                    </div>
-                                )}
 
-                                {/* Call Information */}
-                                {analytics && (
-                                    <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg">
-                                        <h4 className="font-medium text-white mb-2">Call Information</h4>
-                                        <div className="bg-dark-800/50 p-4 rounded-lg">
-                                            {/* Ultravox Data */}
-                                            {analytics.ultravox && (
-                                                <div className="mb-4">
-                                                    <h5 className="text-sm font-medium text-primary-400 mb-2 flex items-center">
-                                                        <Bot size={14} className="mr-1.5"/>
-                                                        Ultravox Details
-                                                    </h5>
-                                                    <div
-                                                        className="space-y-1 text-sm pl-4 border-l-2 border-primary-900/50">
-                                                        {analytics.ultravox.created && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Created:</span>
+                                        {stats.messagesWithoutText > 0 && (
+                                            <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
+                                                <div className="text-gray-400 text-sm mb-1">Voice-only Inputs</div>
+                                                <div
+                                                    className="text-2xl font-bold text-white">{stats.messagesWithoutText} messages
+                                                </div>
+                                                <div className="text-sm text-gray-400 mt-1">
+                                                    These are voice inputs without transcribed text
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Duration sources */}
+                                        <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
+                                            <h4 className="font-medium text-white mb-2">Duration Details</h4>
+                                            <div className="text-sm text-gray-300">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="mb-1">
+                                                            <span
+                                                                className="text-gray-400">Calculated:</span> {formatDuration(stats.totalDuration)}
+                                                        </p>
+                                                        {analytics?.plivo?.call_duration && (
+                                                            <p className="mb-1">
                                                                 <span
-                                                                    className="text-white">{new Date(analytics.ultravox.created).toLocaleString()}</span>
-                                                            </div>
+                                                                    className="text-gray-400">Plivo:</span> {formatDuration(analytics.plivo.call_duration)}
+                                                            </p>
                                                         )}
-                                                        {analytics.ultravox.joined && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Joined:</span>
-                                                                <span
-                                                                    className="text-white">{new Date(analytics.ultravox.joined).toLocaleString()}</span>
-                                                            </div>
+                                                    </div>
+                                                    <div>
+                                                        {analytics?.ultravox?.created && analytics?.ultravox?.ended && (
+                                                            <p className="mb-1">
+                                                                <span className="text-gray-400">Ultravox:</span> {
+                                                                formatDuration(
+                                                                    Math.round(
+                                                                        (new Date(analytics.ultravox.ended) -
+                                                                            new Date(analytics.ultravox.created)) / 1000
+                                                                    )
+                                                                )
+                                                            }
+                                                            </p>
                                                         )}
-                                                        {analytics.ultravox.ended && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Ended:</span>
+                                                        {analytics?.combined?.total_duration && (
+                                                            <p className="mb-1">
                                                                 <span
-                                                                    className="text-white">{new Date(analytics.ultravox.ended).toLocaleString()}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.ultravox.end_reason && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">End Reason:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.ultravox.end_reason}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.ultravox.first_speaker && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">First Speaker:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.ultravox.first_speaker}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.ultravox.language_hint && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Language:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.ultravox.language_hint}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.ultravox.voice && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Voice:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.ultravox.voice}</span>
-                                                            </div>
+                                                                    className="text-gray-400">Combined:</span> {formatDuration(analytics.combined.total_duration)}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
-                                            )}
+                                            </div>
+                                        </div>
 
-                                            {/* Plivo Data */}
-                                            {analytics.plivo && (
-                                                <div>
-                                                    <h5 className="text-sm font-medium text-blue-400 mb-2 flex items-center">
-                                                        <Phone size={14} className="mr-1.5"/>
-                                                        Plivo Details
-                                                    </h5>
-                                                    <div
-                                                        className="space-y-1 text-sm pl-4 border-l-2 border-blue-900/50">
-                                                        {analytics.plivo.from_number && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">To:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.to_number}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.call_direction && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Direction:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.call_direction}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.call_duration && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Duration:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.call_duration} seconds</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.call_state && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">State:</span>
-                                                                <span
-                                                                    className={`text-white px-1.5 py-0.5 rounded-full text-xs ${
-                                                                        analytics.plivo.call_state === 'ANSWER'
-                                                                            ? 'bg-green-900/50 text-green-300'
-                                                                            : 'bg-yellow-900/50 text-yellow-300'
-                                                                    }`}>
+                                        {/* Message Statistics */}
+                                        {transcription.length > 0 && (
+                                            <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mb-6">
+                                                <h4 className="font-medium text-white mb-2">Message Statistics</h4>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    <div className="bg-dark-800/50 p-3 rounded-lg">
+                                                        <p className="text-xs text-gray-400">Agent Messages</p>
+                                                        <p className="text-lg font-bold text-white">{stats.agentMessages}</p>
+                                                    </div>
+                                                    <div className="bg-dark-800/50 p-3 rounded-lg">
+                                                        <p className="text-xs text-gray-400">User Messages</p>
+                                                        <p className="text-lg font-bold text-white">{stats.userMessages}</p>
+                                                    </div>
+                                                    <div className="bg-dark-800/50 p-3 rounded-lg">
+                                                        <p className="text-xs text-gray-400">Agent Response %</p>
+                                                        <p className="text-lg font-bold text-white">
+                                                            {stats.totalMessages > 0
+                                                                ? Math.round((stats.agentMessages / stats.totalMessages) * 100)
+                                                                : 0}%
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-dark-800/50 p-3 rounded-lg">
+                                                        <p className="text-xs text-gray-400">Voice-only %</p>
+                                                        <p className="text-lg font-bold text-white">
+                                                            {stats.totalMessages > 0
+                                                                ? Math.round((stats.messagesWithoutText / stats.totalMessages) * 100)
+                                                                : 0}%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Call Information */}
+                                        <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg">
+                                            <h4 className="font-medium text-white mb-2">Call Information</h4>
+                                            <div className="bg-dark-800/50 p-4 rounded-lg">
+                                                {/* Ultravox Data */}
+                                                {analytics.ultravox && (
+                                                    <div className="mb-4">
+                                                        <h5 className="text-sm font-medium text-primary-400 mb-2 flex items-center">
+                                                            <Bot size={14} className="mr-1.5"/>
+                                                            VT Details
+                                                        </h5>
+                                                        <div
+                                                            className="space-y-1 text-sm pl-4 border-l-2 border-primary-900/50">
+                                                            {analytics.ultravox.created && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Created:</span>
+                                                                    <span
+                                                                        className="text-white">{new Date(analytics.ultravox.created).toLocaleString()}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.joined && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Joined:</span>
+                                                                    <span
+                                                                        className="text-white">{new Date(analytics.ultravox.joined).toLocaleString()}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.ended && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Ended:</span>
+                                                                    <span
+                                                                        className="text-white">{new Date(analytics.ultravox.ended).toLocaleString()}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.end_reason && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">End Reason:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.ultravox.end_reason}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.first_speaker && (
+                                                                <div className="flex justify-between">
+                                                                    <span
+                                                                        className="text-gray-400">First Speaker:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.ultravox.first_speaker}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.language_hint && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Language:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.ultravox.language_hint}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.ultravox.voice && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Voice:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.ultravox.voice}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Plivo Data */}
+                                                {analytics.plivo && (
+                                                    <div>
+                                                        <h5 className="text-sm font-medium text-blue-400 mb-2 flex items-center">
+                                                            <Phone size={14} className="mr-1.5"/>
+                                                            Plivo Details
+                                                        </h5>
+                                                        <div
+                                                            className="space-y-1 text-sm pl-4 border-l-2 border-blue-900/50">
+                                                            {analytics.plivo.from_number && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">To:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.to_number}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.call_direction && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Direction:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.call_direction}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.call_duration && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Duration:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.call_duration} seconds</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.call_state && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">State:</span>
+                                                                    <span
+                                                                        className={`text-white px-1.5 py-0.5 rounded-full text-xs ${
+                                                                            analytics.plivo.call_state === 'ANSWER'
+                                                                                ? 'bg-green-900/50 text-green-300'
+                                                                                : 'bg-yellow-900/50 text-yellow-300'
+                                                                        }`}>
                                   {analytics.plivo.call_state}
                                 </span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.initiation_time && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Initiated:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.initiation_time}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.end_time && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Ended:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.end_time}</span>
-                                                            </div>
-                                                        )}
-                                                        {analytics.plivo.hangup_cause_name && (
-                                                            <div className="flex justify-between">
-                                                                <span className="text-gray-400">Hangup Cause:</span>
-                                                                <span
-                                                                    className="text-white">{analytics.plivo.hangup_cause_name}</span>
-                                                            </div>
-                                                        )}
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.initiation_time && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Initiated:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.initiation_time}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.end_time && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Ended:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.end_time}</span>
+                                                                </div>
+                                                            )}
+                                                            {analytics.plivo.hangup_cause_name && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-gray-400">Hangup Cause:</span>
+                                                                    <span
+                                                                        className="text-white">{analytics.plivo.hangup_cause_name}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
 
-                                {/* Call Summary */}
-                                {analytics?.ultravox?.summary && (
-                                    <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mt-6">
-                                        <h4 className="font-medium text-white mb-2">Call Summary</h4>
-                                        <div className="bg-dark-800/50 p-4 rounded-lg">
-                                            <p className="text-gray-300 italic">{analytics.ultravox.summary}</p>
-                                            {analytics.ultravox.short_summary && (
-                                                <div className="mt-4 pt-4 border-t border-dark-700">
-                                                    <h5 className="text-sm font-medium text-gray-400 mb-2">Short
-                                                        Summary</h5>
-                                                    <p className="text-gray-300">{analytics.ultravox.short_summary}</p>
+                                        {/* Call Summary */}
+                                        {analytics?.ultravox?.summary && (
+                                            <div className="bg-dark-700/50 backdrop-blur-sm p-4 rounded-lg mt-6">
+                                                <h4 className="font-medium text-white mb-2">Call Summary</h4>
+                                                <div className="bg-dark-800/50 p-4 rounded-lg">
+                                                    <p className="text-gray-300 italic">{analytics.ultravox.summary}</p>
+                                                    {analytics.ultravox.short_summary && (
+                                                        <div className="mt-4 pt-4 border-t border-dark-700">
+                                                            <h5 className="text-sm font-medium text-gray-400 mb-2">Short
+                                                                Summary</h5>
+                                                            <p className="text-gray-300">{analytics.ultravox.short_summary}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}
