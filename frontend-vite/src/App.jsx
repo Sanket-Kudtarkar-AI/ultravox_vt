@@ -13,6 +13,7 @@ import Dashboard from './components/Dashboard';
 import PageLayout from './components/ui/PageLayout';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
+import CampaignManager from './components/CampaignManager';
 
 // Generate a unique ID
 const generateId = () => `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -52,6 +53,7 @@ function App() {
 
     // API base URL - update this to your actual API endpoint
     const API_BASE_URL = 'http://localhost:5000/api';
+
 
     // Load agents and recipients from localStorage on component mount
     useEffect(() => {
@@ -731,9 +733,11 @@ function App() {
                             call={activeCall}
                             onRefreshStatus={() => getCallStatus(activeCall.call_uuid)}
                             loading={loading}
+                            onViewAnalysis={(call) => viewCallAnalysis(call)}  // Fix this line
                         />
                     </PageLayout>
                 );
+
 
             case 'recent-calls':
                 return (
@@ -743,13 +747,23 @@ function App() {
                             loading={loading}
                             onRefresh={fetchRecentCalls}
                             onViewDetails={viewCallDetails}
-                            onViewAnalysis={viewCallAnalysis}
+                            onViewAnalysis={viewCallAnalysis}  // Make sure this is the correct function
                             currentPage={currentPage}
                             callsPerPage={callsPerPage}
                             totalCalls={recentCalls.length}
                             paginate={paginate}
                         />
                     </PageLayout>
+                );
+            case 'campaign-manager':
+                return (
+                    <CampaignManager
+                        agents={agents}
+                        onBack={() => setCurrentView('dashboard')}
+                        onCreateAgent={handleCreateAgent}
+                        savedFromNumbers={savedFromNumbers}
+                        API_BASE_URL={API_BASE_URL}
+                    />
                 );
 
             case 'call-details':

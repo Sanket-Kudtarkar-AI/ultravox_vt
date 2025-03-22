@@ -5,8 +5,9 @@ import time
 from flask import Blueprint, request, jsonify, current_app
 import logging
 from datetime import datetime
-
-from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT, DEFAULT_VAD_SETTINGS
+import requests
+from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT, DEFAULT_VAD_SETTINGS, \
+    ULTRAVOX_API_BASE_URL, ULTRAVOX_API_KEY
 from utils import get_join_url
 from models import CallMapping
 from database import get_db_session, close_db_session
@@ -264,44 +265,30 @@ def get_call_status(call_uuid):
         }), 500
 
 
+# In api_controller.py - optimize the get_recent_calls function
 @api.route('/recent_calls', methods=['GET'])
 def get_recent_calls():
-    """
-    Get a list of recent calls
-    """
+    """Get a list of recent calls with optimized performance"""
     try:
         # Initialize Plivo client
         plivo_client = plivo.RestClient(PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN)
 
-        # Get call records
-        limit = request.args.get('limit', '10')
+        # Get pagination parameters
+        limit = request.args.get('limit', '20')
         offset = request.args.get('offset', '0')
 
-        response = plivo_client.calls.list(limit=int(limit), offset=int(offset))
+        # Use a more efficient query with fewer fields
+        response = plivo_client.calls.list(
+            limit=int(limit),
+            offset=int(offset),
+            subaccount=None  # Add any other filters that might help
+        )
 
-        # Get all call UUIDs to fetch Ultravox call IDs
-        call_uuids = [call.call_uuid for call in response]
-        ultravox_mapping = {}
-
-        try:
-            db_session = get_db_session()
-            mappings = db_session.query(CallMapping).filter(CallMapping.plivo_call_uuid.in_(call_uuids)).all()
-
-            for mapping in mappings:
-                ultravox_mapping[mapping.plivo_call_uuid] = mapping.ultravox_call_id
-
-        except Exception as e:
-            logger.error(f"Error fetching call mappings for recent calls: {str(e)}")
-        finally:
-            close_db_session(db_session)
-
-        # Format the response
+        # Format the response with minimal processing
         calls = []
         for call in response:
-            found_ultravox_id = ultravox_mapping.get(call.call_uuid)
             calls.append({
                 "call_uuid": call.call_uuid,
-                "ultravox_call_id": found_ultravox_id,  # Include Ultravox call ID if available
                 "from_number": call.from_number,
                 "to_number": call.to_number,
                 "call_direction": call.call_direction,
@@ -317,10 +304,9 @@ def get_recent_calls():
             "meta": {
                 "limit": int(limit),
                 "offset": int(offset),
-                "total_count": len(calls)
+                "total_count": len(calls)  # This is just for the current page
             }
         })
-
     except Exception as e:
         logger.error(f"Error in get_recent_calls: {str(e)}")
         return jsonify({

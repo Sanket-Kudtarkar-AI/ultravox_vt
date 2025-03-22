@@ -1,8 +1,12 @@
 import React from 'react';
-import {RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle, AlertCircle} from 'lucide-react';
+import {
+    RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle,
+    AlertCircle, Tag, MessageSquare, FileAudio
+} from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import Pagination from './ui/Pagination';
 
 const RecentCalls = ({
                          calls,
@@ -55,9 +59,39 @@ const RecentCalls = ({
         }
     };
 
+    // Helper to format timestamp
+    const formatDateTime = (dateTimeStr) => {
+        if (!dateTimeStr) return 'N/A';
+        const date = new Date(dateTimeStr);
+        return date.toLocaleString();
+    };
+
+    // Helper to format campaign badge
+    const getCampaignBadge = (campaign) => {
+        if (campaign === 'General') {
+            return <Badge variant="default">General</Badge>;
+        } else {
+            return <Badge variant="purple" glow>
+                <div className="flex items-center">
+                    <Tag size={12} className="mr-1"/>
+                    {campaign}
+                </div>
+            </Badge>;
+        }
+    };
+
+    // Helper to determine if a call has available data
+    const hasData = (call) => {
+        // Make all calls with a call_uuid clickable
+        return !!call.call_uuid;
+    };
+
     // Calculate pagination metrics
     const indexOfFirstCall = (currentPage - 1) * callsPerPage;
     const indexOfLastCall = Math.min(currentPage * callsPerPage, totalCalls);
+
+    // Total page count for pagination
+    const totalPages = Math.ceil(totalCalls / callsPerPage);
 
     return (
         <Card className="overflow-hidden">
@@ -88,42 +122,20 @@ const RecentCalls = ({
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    {/* Add this after the header div but before the content */}
+                    {/* Pagination controls at top */}
                     {calls.length > 0 && (
                         <div className="p-4 border-b border-dark-700 flex justify-between items-center">
                             <div className="text-sm text-gray-400">
                                 Showing {indexOfFirstCall + 1} to {indexOfLastCall} of {totalCalls} calls
                             </div>
-                            <div className="flex space-x-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => paginate(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                >
-                                    Previous
-                                </Button>
-                                {Array.from({length: Math.ceil(totalCalls / callsPerPage)}).map((_, index) => (
-                                    <Button
-                                        key={index}
-                                        variant={currentPage === index + 1 ? "primary" : "outline"}
-                                        size="sm"
-                                        onClick={() => paginate(index + 1)}
-                                    >
-                                        {index + 1}
-                                    </Button>
-                                )).slice(Math.max(0, currentPage - 3), Math.min(currentPage + 2, Math.ceil(totalCalls / callsPerPage)))}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => paginate(currentPage + 1)}
-                                    disabled={currentPage === Math.ceil(totalCalls / callsPerPage)}
-                                >
-                                    Next
-                                </Button>
-                            </div>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={paginate}
+                            />
                         </div>
                     )}
+
                     <table className="w-full">
                         <thead className="bg-dark-700/50">
                         <tr>
@@ -134,6 +146,7 @@ const RecentCalls = ({
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Duration</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Campaign</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                         </tr>
                         </thead>
@@ -149,7 +162,7 @@ const RecentCalls = ({
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-gray-400 flex items-center">
                                         <Clock size={14} className="mr-1 text-primary-400"/>
-                                        {new Date(call.initiation_time).toLocaleString()}
+                                        {formatDateTime(call.initiation_time)}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -159,6 +172,9 @@ const RecentCalls = ({
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     {getStatusBadge(call.call_state)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {getCampaignBadge(call.campaign || 'General')}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex space-x-2">
@@ -186,40 +202,17 @@ const RecentCalls = ({
                         </tbody>
                     </table>
 
-                    {/* Pagination Controls */}
+                    {/* Pagination Controls at bottom */}
                     {calls.length > 0 && (
                         <div className="p-4 border-t border-dark-700 flex justify-between items-center">
                             <div className="text-sm text-gray-400">
                                 Showing {indexOfFirstCall + 1} to {indexOfLastCall} of {totalCalls} calls
                             </div>
-                            <div className="flex space-x-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => paginate(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                >
-                                    Previous
-                                </Button>
-                                {Array.from({length: Math.ceil(totalCalls / callsPerPage)}).map((_, index) => (
-                                    <Button
-                                        key={index}
-                                        variant={currentPage === index + 1 ? "primary" : "outline"}
-                                        size="sm"
-                                        onClick={() => paginate(index + 1)}
-                                    >
-                                        {index + 1}
-                                    </Button>
-                                )).slice(Math.max(0, currentPage - 3), Math.min(currentPage + 2, Math.ceil(totalCalls / callsPerPage)))}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => paginate(currentPage + 1)}
-                                    disabled={currentPage === Math.ceil(totalCalls / callsPerPage)}
-                                >
-                                    Next
-                                </Button>
-                            </div>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={paginate}
+                            />
                         </div>
                     )}
                 </div>

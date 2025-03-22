@@ -1,9 +1,12 @@
 import requests
 import logging
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, Response
 import plivo
-
 from config import ULTRAVOX_API_KEY, ULTRAVOX_API_BASE_URL, PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, setup_logging
+import openai
+import os
+import re
+import json
 
 # Set up logging
 logger = setup_logging("analysis_controller", "analysis_controller.log")
@@ -11,6 +14,61 @@ logger = setup_logging("analysis_controller", "analysis_controller.log")
 # Create a Blueprint for analysis API routes
 analysis = Blueprint('analysis', __name__)
 
+
+@analysis.route('/proxy_audio/<path:url>', methods=['GET'])
+def proxy_audio(url):
+    """
+    Proxy endpoint to avoid CORS issues with audio files
+    """
+    try:
+        logger.info(f"Proxying audio from URL: {url}")
+
+        # Decode the URL if it's URL-encoded
+        import urllib.parse
+        decoded_url = urllib.parse.unquote(url)
+
+        # Fetch the audio file
+        response = requests.get(decoded_url, stream=True)
+
+        if not response.ok:
+            logger.error(f"Error fetching audio: {response.status_code} - {response.reason}")
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to fetch audio: {response.status_code} - {response.reason}"
+            }), response.status_code
+
+        # Set appropriate headers for audio streaming
+        headers = {
+            'Content-Type': response.headers.get('Content-Type', 'audio/wav'),
+            'Content-Length': response.headers.get('Content-Length'),
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'  # Allow cross-origin access
+        }
+
+        # Log success
+        logger.info(
+            f"Successfully proxying audio, content-type: {headers['Content-Type']}, size: {headers.get('Content-Length', 'unknown')}")
+
+        # Stream the response
+        return Response(
+            response.iter_content(chunk_size=1024),
+            headers=headers,
+            status=200
+        )
+
+    except Exception as e:
+        logger.error(f"Error proxying audio: {str(e)}")
+        # Return a more detailed error for debugging
+        import traceback
+        stack_trace = traceback.format_exc()
+        logger.error(f"Stack trace: {stack_trace}")
+
+        return jsonify({
+            "status": "error",
+            "message": f"Server error: {str(e)}",
+            "details": stack_trace
+        }), 500
 
 @analysis.route('/call_transcription/<call_id>', methods=['GET'])
 def get_call_transcription(call_id):
@@ -61,10 +119,11 @@ def get_call_transcription(call_id):
         }), 500
 
 
+# In analysis_controller.py - update the get_call_recording function
 @analysis.route('/call_recording/<call_id>', methods=['GET'])
 def get_call_recording(call_id):
     """
-    Fetch call recording URL from Ultravox API
+    Fetch call recording URL from Ultravox API and serve with proper CORS headers
     """
     try:
         logger.info(f"Fetching recording URL for call ID: {call_id}")

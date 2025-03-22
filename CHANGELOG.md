@@ -13,6 +13,51 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [1.8.0] - 2025-03-23
+
+### Added
+- Added new AI Analysis tab in the Analysis component for enhanced insights
+- Implemented audio proxy endpoint to resolve CORS issues with recordings
+- Added robust error handling throughout the application
+- Enhanced audio recording playback with fallback mechanisms
+- Included direct download links for call recordings
+- Added debug logging for improved troubleshooting
+
+### Fixed
+- Critical issue with Analysis button in Recent Calls table
+- Fixed timestamp display in transcription that was previously invisible
+- Resolved "Recording not ready" errors showing up in wrong tabs
+- Fixed CORS issues with audio file playback
+- Improved error isolation so failures in one component don't affect others
+- Enhanced robustness of API response handling
+- Fixed issues with WaveformPlayer visualization
+- Properly disabled Analysis buttons for calls that aren't completed
+
+### Changed
+- Moved call summary to the top of Analytics tab for better visibility
+- Simplified metrics in Analytics tab by removing redundant information
+- Enhanced recording player UI with better error states and fallbacks
+- Improved timestamp formatting with more readable display
+- Updated error messages to be more user-friendly and informative
+- Enhanced API integration between Plivo and Ultravox services
+- Optimized data fetching to reduce loading times
+- Improved response handling for different API status codes
+
+
+### Technical
+- Refactored Analysis component for better maintainability
+- Improved state management for call data
+- Enhanced conditional rendering based on data availability
+- Implemented better error boundaries for critical components
+- Added fallback UI for scenarios where API data is unavailable
+
+### Known Issues
+
+- Need to work on timestamps to call transcriptions with IST time format
+
+
+
 ## [1.7.0] - 2025-03-24
 
 ### Added

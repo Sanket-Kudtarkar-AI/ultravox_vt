@@ -3,12 +3,13 @@ ultravoxcalls/
 ├── backend/
 │   ├── plivo_server.py            # Main Flask application
 │   ├── api_controller.py          # API endpoints for Plivo
-│   ├── analysis_controller.py     # Controller for analysis features
+│   ├── analysis_controller.py     # Controller for analysis features (updated with audio proxy)
+│   ├── campaign_controller.py     # NEW: Controller for campaign management
 │   ├── utils.py                   # Utility functions
-│   ├── models.py                  # Database models
+│   ├── models.py                  # Database models (updated with Campaign models)
 │   ├── database.py                # Database setup and session management
 │   ├── config.py                  # Configuration and constants
-│   ├── requirements.txt           # Python dependencies
+│   ├── requirements.txt           # Python dependencies (updated with OpenAI)
 │   └── calls.db                   # SQLite database file
 │
 ├── frontend/
@@ -16,20 +17,23 @@ ultravoxcalls/
 │   │   ├── index.html             # Updated with modern fonts
 │   │   └── assets/                # Static assets
 │   ├── src/
-│   │   ├── App.jsx                # Main application with mobile layout fixes
+│   │   ├── App.jsx                # Main application (updated with campaign route)
 │   │   ├── App.css                # Global styles with animations
 │   │   ├── index.js               # Entry point
 │   │   ├── index.css              # Global styles with custom scrollbar and Tailwind
 │   │   ├── components/
 │   │   │   ├── Dashboard.jsx      # Dashboard with fixed "View all calls" button
-│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with mobile layout fixes
+│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with campaign navigation
 │   │   │   ├── AgentSelector.jsx  # Agent selection modal
 │   │   │   ├── AgentForm.jsx      # Agent form with expanded duration options
 │   │   │   ├── NewCallForm.jsx    # Improved call form with number dropdowns
-│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring
+│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring (fixed Analysis button)
 │   │   │   ├── CallDetails.jsx    # Call details view
-│   │   │   ├── RecentCalls.jsx    # Call history with pagination
-│   │   │   ├── Analysis.jsx       # Call analysis component
+│   │   │   ├── RecentCalls.jsx    # Call history with pagination (improved)
+│   │   │   ├── Analysis.jsx       # Enhanced call analysis component with timestamp fixes
+│   │   │   ├── EntityAnalysis.jsx # NEW: OpenAI-powered entity extraction
+│   │   │   ├── WaveformPlayer.jsx # NEW: Audio visualization with waveform
+│   │   │   ├── CampaignManager.jsx # NEW: Campaign management interface
 │   │   │   └── ui/                # UI component library
 │   │   │       ├── Card.jsx       # Reusable card component
 │   │   │       ├── Button.jsx     # Button component
@@ -38,6 +42,7 @@ ultravoxcalls/
 │   │   │       ├── Modal.jsx      # Modal component
 │   │   │       ├── Badge.jsx      # Status badge component
 │   │   │       ├── PageLayout.jsx # Page layout component
+│   │   │       ├── Pagination.jsx # Pagination component
 │   │   │       └── TabButton.jsx  # Tab navigation component
 │   │   ├── utils/
 │   │   │   ├── formatters.js      # Date and time formatting utilities
@@ -46,10 +51,7 @@ ultravoxcalls/
 │   │   │   └── ThemeContext.js    # Theme management (future)
 │   │   └── hooks/
 │   │       └── useApi.js          # Custom hook for API calls
-│   ├── package.json
+│   ├── package.json               # Updated with papaparse
 │   ├── tailwind.config.js         # Updated with animations and effects
 │   └── postcss.config.js
-│
-├── README.md
-├── CHANGELOG.md                   # Updated with v1.5.0 changes
-└── debugging-guide.md
+└── CHANGELOG.md                   # Updated with v1.8.0 changes
