@@ -5,14 +5,19 @@ import json
 from flask_cors import CORS
 import logging
 import threading
+import traceback
 
 # Import from configuration and utilities
 from config import setup_logging, ULTRAVOX_API_BASE_URL, DEFAULT_VAD_SETTINGS, SYSTEM_PROMPT
 from utils import get_join_url
 from api_controller import api
 from analysis_controller import analysis
+from agent_controller import agent
+from phone_controller import phone
+from campaign_controller import campaign
 from database import init_db, get_db_session, close_db_session
-from models import CallMapping
+from models import CallLog, CallMapping, Agent
+
 
 # Create a filter to ignore frequent endpoint logs
 class EndpointFilter(logging.Filter):
@@ -25,6 +30,7 @@ class EndpointFilter(logging.Filter):
         if 'GET /api/call_status/' in message:
             return False
         return True
+
 
 # Apply the filter to the Werkzeug logger
 logging.getLogger('werkzeug').addFilter(EndpointFilter())
@@ -45,12 +51,16 @@ init_db()
 # Register the API blueprints
 app.register_blueprint(api, url_prefix='/api')
 app.register_blueprint(analysis, url_prefix='/api')
+app.register_blueprint(agent, url_prefix='/api')
+app.register_blueprint(phone, url_prefix='/api')
+app.register_blueprint(campaign, url_prefix='/api')
 
 
 @app.route('/answer_url', methods=['GET'])
 def answer_url():
     """
     This endpoint is called by Plivo when a call is answered.
+    Updated to work with new database schema.
     """
     call_uuid = request.args.get('CallUUID', 'unknown')
     logger.info(f"Call answered - CallUUID: {call_uuid}")
@@ -76,7 +86,8 @@ def answer_url():
         elif isinstance(msg, dict) and "text" in msg:
             formatted_initial_messages.append({"text": msg["text"]})
 
-    inactivity_messages = current_app.config.get("CUSTOM_INACTIVITY_MESSAGES", [{"duration": "8s", "message": "are you there?"}])
+    inactivity_messages = current_app.config.get("CUSTOM_INACTIVITY_MESSAGES",
+                                                 [{"duration": "8s", "message": "are you there?"}])
     recording_enabled = current_app.config.get("CUSTOM_RECORDING_ENABLED", True)
 
     logger.info(f"Using system_prompt: {system_prompt[:50]}...")
@@ -115,22 +126,58 @@ def answer_url():
         current_app.config["CURRENT_ULTRAVOX_CALL_ID"] = call_id
         current_app.config["CURRENT_PLIVO_CALL_UUID"] = call_uuid
 
-        # Store the mapping in the database immediately
+        # Get phone numbers from request
+        recipient_number = request.args.get('To', '')
+        from_number = request.args.get('From', '')
+
+        # Update the database with call information
         try:
             db_session = get_db_session()
 
+            # First check if a CallLog record already exists for this call_uuid
+            call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+            if call_log:
+                # Update the existing record
+                logger.info(f"Updating existing call record: {call_uuid}")
+                call_log.ultravox_id = call_id
+                if not call_log.to_number:
+                    call_log.to_number = recipient_number
+                if not call_log.from_number:
+                    call_log.from_number = from_number
+                call_log.system_prompt = system_prompt
+                call_log.language_hint = language_hint
+                call_log.voice = voice
+                call_log.max_duration = max_duration
+            else:
+                # Create a new CallLog record
+                logger.info(f"Creating new call record: {call_uuid}")
+                new_call = CallLog(
+                    call_uuid=call_uuid,
+                    ultravox_id=call_id,
+                    to_number=recipient_number,
+                    from_number=from_number,
+                    system_prompt=system_prompt,
+                    language_hint=language_hint,
+                    voice=voice,
+                    max_duration=max_duration,
+                    initiation_time=datetime.now()
+                )
+                db_session.add(new_call)
+
+            # Also maintain the legacy mapping for backward compatibility
             # Check if mapping already exists
             existing_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
 
             if existing_mapping:
                 logger.info(f"Updating existing call mapping: {call_uuid} -> {call_id}")
                 existing_mapping.ultravox_call_id = call_id
-                db_session.commit()
+                existing_mapping.recipient_phone_number = recipient_number
+                existing_mapping.plivo_phone_number = from_number
+                existing_mapping.system_prompt = system_prompt
             else:
                 # Create a new mapping
-                recipient_number = request.args.get('To', '')
-                from_number = request.args.get('From', '')
-
+                logger.info(f"Creating new call mapping: {call_uuid} -> {call_id}")
                 new_mapping = CallMapping(
                     plivo_call_uuid=call_uuid,
                     ultravox_call_id=call_id,
@@ -138,12 +185,13 @@ def answer_url():
                     plivo_phone_number=from_number,
                     system_prompt=system_prompt
                 )
-
                 db_session.add(new_mapping)
-                db_session.commit()
-                logger.info(f"Created new call mapping in answer_url: {call_uuid} -> {call_id}")
+
+            db_session.commit()
+            logger.info(f"Database updated successfully for call {call_uuid}")
         except Exception as e:
-            logger.error(f"Error storing call mapping in answer_url: {str(e)}")
+            logger.error(f"Error updating database in answer_url: {str(e)}")
+            logger.error(traceback.format_exc())
         finally:
             close_db_session(db_session)
 
@@ -161,6 +209,7 @@ def answer_url():
     except Exception as e:
         error_msg = f"Error processing answer_url: {str(e)}"
         logger.error(error_msg)
+        logger.error(traceback.format_exc())
         return Response(f"Error: {str(e)}", status=500)
 
 
@@ -168,6 +217,7 @@ def answer_url():
 def hangup_url():
     """
     This endpoint is called by Plivo when a call is hung up.
+    Updated to work with new database schema.
     """
     logger.info("Call hung up")
     logger.info(f"Hangup data: {request.form}")
@@ -185,46 +235,92 @@ def hangup_url():
     ultravox_call_id = current_app.config.get("CURRENT_ULTRAVOX_CALL_ID")
     logger.info(f"Hangup handler app context Ultravox ID: {ultravox_call_id}")
 
-    if ultravox_call_id:
-        logger.info(f"Associated Ultravox call ID: {ultravox_call_id}")
+    # Get call details from the request form
+    recipient_number = request.form.get('To', '')
+    plivo_number = request.form.get('From', '')
+    bill_duration = request.form.get('BillDuration', '0')
+    total_cost = request.form.get('TotalCost', '0')
 
-        # Save the mapping to the database if not already saved
-        try:
-            session = get_db_session()
+    # Update the database with call information
+    try:
+        db_session = get_db_session()
 
+        # Update CallLog record
+        call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        if call_log:
+            # Update existing record
+            logger.info(f"Updating existing call record on hangup: {call_uuid}")
+            if ultravox_call_id and not call_log.ultravox_id:
+                call_log.ultravox_id = ultravox_call_id
+
+            # Update call details
+            call_log.call_state = call_status
+            call_log.call_duration = int(duration) if duration and duration != 'unknown' else None
+            call_log.hangup_cause = hangup_cause if hangup_cause != 'unknown' else None
+            call_log.end_time = datetime.now()
+
+            # Store additional data
+            plivo_data = call_log.plivo_data
+            if plivo_data:
+                try:
+                    plivo_data_dict = json.loads(plivo_data)
+                except:
+                    plivo_data_dict = {}
+            else:
+                plivo_data_dict = {}
+
+            plivo_data_dict.update({
+                'bill_duration': bill_duration,
+                'total_cost': total_cost,
+                'hangup_data': {k: request.form.get(k) for k in request.form}
+            })
+
+            call_log.plivo_data = json.dumps(plivo_data_dict)
+        else:
+            # Create new record if it doesn't exist
+            logger.info(f"Creating new call record on hangup: {call_uuid}")
+            new_call = CallLog(
+                call_uuid=call_uuid,
+                ultravox_id=ultravox_call_id,
+                to_number=recipient_number,
+                from_number=plivo_number,
+                call_state=call_status,
+                call_duration=int(duration) if duration and duration != 'unknown' else None,
+                hangup_cause=hangup_cause if hangup_cause != 'unknown' else None,
+                initiation_time=datetime.now() - (datetime.now() - datetime.now()),  # Approximate
+                end_time=datetime.now(),
+                plivo_data=json.dumps({
+                    'bill_duration': bill_duration,
+                    'total_cost': total_cost,
+                    'hangup_data': {k: request.form.get(k) for k in request.form}
+                })
+            )
+            db_session.add(new_call)
+
+        # Update legacy CallMapping
+        if ultravox_call_id:
             # Check if mapping exists
-            existing_mapping = session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
+            mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
 
-            if not existing_mapping:
+            if not mapping:
                 # Create new mapping
-                recipient_number = request.form.get('To', '')
-                plivo_number = request.form.get('From', '')
-
                 new_mapping = CallMapping(
                     plivo_call_uuid=call_uuid,
                     ultravox_call_id=ultravox_call_id,
                     recipient_phone_number=recipient_number,
                     plivo_phone_number=plivo_number
                 )
+                db_session.add(new_mapping)
+                logger.info(f"Created new legacy mapping on hangup: {call_uuid} -> {ultravox_call_id}")
 
-                session.add(new_mapping)
-                session.commit()
-                logger.info(f"Created new call mapping in hangup_url: {call_uuid} -> {ultravox_call_id}")
-            else:
-                logger.info(f"Call mapping already exists for {call_uuid} -> {existing_mapping.ultravox_call_id}")
-
-                # Update the mapping if needed (e.g., if the call_id changed)
-                if existing_mapping.ultravox_call_id != ultravox_call_id:
-                    existing_mapping.ultravox_call_id = ultravox_call_id
-                    session.commit()
-                    logger.info(f"Updated existing call mapping: {call_uuid} -> {ultravox_call_id}")
-
-        except Exception as e:
-            logger.error(f"Error saving call mapping in hangup_url: {str(e)}")
-        finally:
-            close_db_session(session)
-    else:
-        logger.warning(f"No Ultravox call ID found in app context for call {call_uuid}")
+        db_session.commit()
+        logger.info(f"Database updated successfully for call {call_uuid} on hangup")
+    except Exception as e:
+        logger.error(f"Error updating database in hangup_url: {str(e)}")
+        logger.error(traceback.format_exc())
+    finally:
+        close_db_session(db_session)
 
     # Clear the stored call IDs
     current_app.config["CURRENT_ULTRAVOX_CALL_ID"] = None
@@ -263,8 +359,9 @@ def home():
             "/api/call_transcription/<call_id> - Get call transcription",
             "/api/call_recording/<call_id> - Get call recording URL",
             "/api/call_analytics/<call_id>/<call_uuid> - Get call analytics",
-            "/api/call_mapping/<call_uuid> - Get call mapping",
-            "/api/set_call_mapping/<call_uuid>/<ultravox_call_id> - Set call mapping (for testing)"
+            "/api/agents - Manage agents",
+            "/api/campaigns - Manage campaigns",
+            "/api/phone-numbers - Manage saved phone numbers"
         ],
         "timestamp": datetime.now().isoformat()
     })
@@ -276,6 +373,7 @@ def handle_exception(e):
     Global exception handler to log all errors
     """
     logger.error(f"Unhandled exception: {str(e)}")
+    logger.error(traceback.format_exc())
     return jsonify({"error": str(e)}), 500
 
 

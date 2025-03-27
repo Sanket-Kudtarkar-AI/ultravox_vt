@@ -5,13 +5,32 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2025-03-28
 
-# Changelog
+### Added
+- Complete database architecture overhaul with comprehensive models
+- New controllers for agent, campaign, and phone number management
+- Robust API client utilities for frontend-backend integration
+- Caching mechanisms for API responses to improve performance
+- Proper datetime handling for SQLite compatibility
+- Enhanced debugging with detailed error logging and tracebacks
 
-All notable changes to the AI Voice Call System will be documented in this file.
+### Changed
+- Migrated from localStorage to database-driven architecture
+- Enhanced RecentCalls component to use API data with pagination
+- Updated App.jsx to interact with the backend instead of localStorage
+- Improved error handling throughout the application
+- Enhanced data normalization for consistency
+- Optimized database queries for better performance
+- Updated Python dependencies to support new features
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Fixed
+- Critical datetime handling issue with SQLite database
+- RecentCalls component now properly displays call history from database
+- Fixed call status API to properly handle timestamp data
+- Resolved issues with call analytics data storage
+- Improved error handling to prevent application crashes
+- Enhanced logging for better debugging
 
 
 ## [1.8.0] - 2025-03-23

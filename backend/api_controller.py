@@ -9,8 +9,9 @@ import requests
 from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SYSTEM_PROMPT, DEFAULT_VAD_SETTINGS, \
     ULTRAVOX_API_BASE_URL, ULTRAVOX_API_KEY
 from utils import get_join_url
-from models import CallMapping
+from models import CallMapping, CallLog, Agent, Campaign, CampaignContact, SavedPhoneNumber
 from database import get_db_session, close_db_session
+import traceback
 
 # Set up logging
 logger = setup_logging("api_controller", "api_controller.log")
@@ -19,10 +20,33 @@ logger = setup_logging("api_controller", "api_controller.log")
 api = Blueprint('api', __name__)
 
 
+# Helper function to parse Plivo datetime strings
+def parse_plivo_datetime(date_string):
+    """
+    Parse Plivo datetime strings into Python datetime objects
+    Handles various formats including those with timezone info
+    """
+    if not date_string:
+        return None
+
+    try:
+        # Try the format with timezone offset (e.g., '2025-03-27 15:20:31+05:30')
+        return datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S%z')
+    except ValueError:
+        try:
+            # Try without timezone (e.g., '2025-03-27 15:20:31')
+            return datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            # Log the issue and return current time as fallback
+            logger.warning(f"Could not parse datetime string: {date_string}")
+            return datetime.now()
+
+
 @api.route('/make_call', methods=['POST'])
 def make_call_api():
     """
     API endpoint for making a call with custom parameters.
+    Enhanced to work with new database schema.
     """
     try:
         data = request.json
@@ -44,6 +68,8 @@ def make_call_api():
         max_duration = data.get("max_duration", "180s")
         voice = data.get("voice", "Maushmi")
         vad_settings = data.get("vad_settings", DEFAULT_VAD_SETTINGS)
+        agent_id = data.get("agent_id")
+        campaign_id = data.get("campaign_id")
 
         # Handle initial_messages formatting
         initial_messages = data.get("initial_messages", [])
@@ -61,6 +87,56 @@ def make_call_api():
         # Initialize Plivo client
         logger.info(f"Initializing Plivo client with Auth ID: {PLIVO_AUTH_ID[:5]}*****")
         plivo_client = plivo.RestClient(PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN)
+
+        # Check if agent exists if agent_id is provided
+        agent = None
+        db_session = get_db_session()
+        try:
+            if agent_id:
+                agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
+                if agent:
+                    # Use agent's configuration if available
+                    if agent.system_prompt:
+                        system_prompt = agent.system_prompt
+
+                    # Parse settings JSON
+                    settings = json.loads(agent.settings)
+
+                    if settings.get("language_hint"):
+                        language_hint = settings["language_hint"]
+
+                    if settings.get("voice"):
+                        voice = settings["voice"]
+
+                    if settings.get("max_duration"):
+                        max_duration = settings["max_duration"]
+
+                    if settings.get("vad_settings"):
+                        vad_settings = settings["vad_settings"]
+
+                    if settings.get("inactivity_messages"):
+                        inactivity_messages = settings["inactivity_messages"]
+
+                    if settings.get("recording_enabled") is not None:
+                        recording_enabled = settings["recording_enabled"]
+
+                    initial_messages = json.loads(agent.initial_messages)
+                    # Format initial messages for Ultravox API
+                    formatted_initial_messages = []
+                    for msg in initial_messages:
+                        if isinstance(msg, str):
+                            formatted_initial_messages.append({"text": msg})
+                        elif isinstance(msg, dict) and "text" in msg:
+                            formatted_initial_messages.append({"text": msg["text"]})
+
+            # Check campaign if campaign_id is provided
+            campaign = None
+            if campaign_id:
+                campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
+        except Exception as e:
+            logger.error(f"Error checking agent or campaign: {str(e)}")
+            # Continue with default values if agent lookup fails
+            pass
 
         # Construct the answer URL
         answer_url = f"{NGROK_URL}/answer_url"
@@ -119,11 +195,65 @@ def make_call_api():
         logger.info(f"Ultravox Call ID: {ultravox_call_id}")
         logger.info(f"Call mapping created: Plivo UUID {call.request_uuid} -> Ultravox ID {ultravox_call_id}")
 
-        # Store the mapping in the database
+        # Save the phone numbers to the database if they don't exist
         try:
-            db_session = get_db_session()
+            # Normalize phone numbers
+            if not recipient_number.startswith('+'):
+                recipient_number = '+' + recipient_number
 
-            # Create a new CallMapping record
+            if not plivo_number.startswith('+'):
+                plivo_number = '+' + plivo_number
+
+            # Check if recipient number exists
+            recipient = db_session.query(SavedPhoneNumber).filter_by(phone_number=recipient_number).first()
+            if not recipient:
+                new_recipient = SavedPhoneNumber(
+                    phone_number=recipient_number,
+                    number_type='recipient',
+                    last_used=datetime.now()
+                )
+                db_session.add(new_recipient)
+            else:
+                # Update last_used time
+                recipient.last_used = datetime.now()
+
+            # Check if from number exists
+            from_num = db_session.query(SavedPhoneNumber).filter_by(phone_number=plivo_number).first()
+            if not from_num:
+                new_from = SavedPhoneNumber(
+                    phone_number=plivo_number,
+                    number_type='from',
+                    last_used=datetime.now()
+                )
+                db_session.add(new_from)
+            else:
+                # Update last_used time
+                from_num.last_used = datetime.now()
+
+            db_session.commit()
+        except Exception as e:
+            logger.error(f"Error saving phone numbers: {str(e)}")
+            # Continue if saving phone numbers fails
+
+        # Create a new CallLog record
+        try:
+            new_call = CallLog(
+                call_uuid=call.request_uuid,
+                ultravox_id=ultravox_call_id,
+                agent_id=agent_id,
+                campaign_id=campaign_id,
+                to_number=recipient_number,
+                from_number=plivo_number,
+                initiation_time=datetime.now(),
+                system_prompt=system_prompt,
+                language_hint=language_hint,
+                voice=voice,
+                max_duration=max_duration
+            )
+
+            db_session.add(new_call)
+
+            # Also maintain the legacy CallMapping for backward compatibility
             call_mapping = CallMapping(
                 plivo_call_uuid=call.request_uuid,
                 ultravox_call_id=ultravox_call_id,
@@ -133,12 +263,26 @@ def make_call_api():
             )
 
             db_session.add(call_mapping)
+
+            # If this is a campaign call, update the campaign contact
+            if campaign_id:
+                contact = db_session.query(CampaignContact).filter_by(
+                    campaign_id=campaign_id,
+                    phone=recipient_number,
+                    status='pending'
+                ).first()
+
+                if contact:
+                    contact.status = 'calling'
+                    contact.call_uuid = call.request_uuid
+
             db_session.commit()
-            logger.info(f"Call mapping stored in database from make_call_api: {call_mapping}")
+            logger.info(f"Call record created in database: {new_call.id}")
+
         except Exception as e:
-            logger.error(f"Error storing call mapping in make_call_api: {str(e)}")
-        finally:
-            close_db_session(db_session)
+            logger.error(f"Error creating call records: {str(e)}")
+            logger.error(traceback.format_exc())
+            # Continue even if database operations fail
 
         # Return success response with call UUID and Ultravox call ID
         return jsonify({
@@ -151,53 +295,92 @@ def make_call_api():
 
     except Exception as e:
         logger.error(f"Error in make_call_api: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({
             "status": "error",
             "message": str(e)
         }), 500
+    finally:
+        try:
+            close_db_session(db_session)
+        except:
+            pass
 
 
 @api.route('/call_status/<call_uuid>', methods=['GET'])
 def get_call_status(call_uuid):
     """
     Get the status of a call by UUID
+    Enhanced to work with the new database schema
     """
     try:
         # Initialize Plivo client
         plivo_client = plivo.RestClient(PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN)
 
-        # Get the Ultravox call ID from the database if available
+        # Get the call data from our database
+        db_session = get_db_session()
+        call_data = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        # If call not in our database, try legacy mapping
         ultravox_call_id = None
-        try:
-            db_session = get_db_session()
+        if not call_data:
+            # Try to get from legacy mapping
             call_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
             if call_mapping:
                 ultravox_call_id = call_mapping.ultravox_call_id
-                # Only log this message once per minute per call_uuid
-                current_time = time.time()
-                last_log_time = getattr(get_call_status, f'last_log_time_{call_uuid}', 0)
-                if current_time - last_log_time > 60:  # Log once per minute
-                    logger.info(f"Found Ultravox call ID for {call_uuid}: {ultravox_call_id}")
-                    setattr(get_call_status, f'last_log_time_{call_uuid}', current_time)
-            else:
-                # Only log this once per call_uuid
-                if not hasattr(get_call_status, f'logged_no_mapping_{call_uuid}'):
-                    logger.warning(f"No mapping found for call UUID: {call_uuid}")
-                    setattr(get_call_status, f'logged_no_mapping_{call_uuid}', True)
-        except Exception as e:
-            logger.error(f"Error fetching call mapping: {str(e)}")
-        finally:
-            close_db_session(db_session)
+
+                # Create a new CallLog record from the mapping
+                try:
+                    new_call = CallLog(
+                        call_uuid=call_mapping.plivo_call_uuid,
+                        ultravox_id=call_mapping.ultravox_call_id,
+                        to_number=call_mapping.recipient_phone_number,
+                        from_number=call_mapping.plivo_phone_number,
+                        system_prompt=call_mapping.system_prompt,
+                        initiation_time=call_mapping.timestamp
+                    )
+
+                    db_session.add(new_call)
+                    db_session.commit()
+                    db_session.refresh(new_call)
+
+                    # Use the newly created record
+                    call_data = new_call
+
+                except Exception as e:
+                    logger.error(f"Error creating CallLog from legacy mapping: {str(e)}")
+        else:
+            ultravox_call_id = call_data.ultravox_id
+
+        # Only log this message once per minute per call_uuid
+        current_time = time.time()
+        last_log_time = getattr(get_call_status, f'last_log_time_{call_uuid}', 0)
+        if current_time - last_log_time > 60:  # Log once per minute
+            logger.info(f"Call status check for {call_uuid}")
+            logger.info(f"Ultravox call ID for {call_uuid}: {ultravox_call_id}")
+            setattr(get_call_status, f'last_log_time_{call_uuid}', current_time)
 
         # Try to get live call status first
         try:
             # Use the correct method for getting live call details
             response = plivo_client.live_calls.get(call_uuid)
 
+            # Update the call status in our database
+            if call_data:
+                call_data.call_state = response.call_status if hasattr(response, 'call_status') else None
+                # Store the full Plivo response
+                plivo_data = {}
+                for attr in dir(response):
+                    if not attr.startswith('_') and not callable(getattr(response, attr)):
+                        plivo_data[attr] = getattr(response, attr)
+
+                call_data.plivo_data = json.dumps(plivo_data)
+                db_session.commit()
+
             return jsonify({
                 "status": "success",
                 "call_status": "live",
-                "ultravox_call_id": ultravox_call_id,  # Include Ultravox call ID
+                "ultravox_call_id": ultravox_call_id,
                 "details": {
                     "direction": response.direction if hasattr(response, 'direction') else None,
                     "from": response.from_number if hasattr(response, 'from_number') else None,
@@ -225,10 +408,61 @@ def get_call_status(call_uuid):
 
             try:
                 response = plivo_client.calls.get(call_uuid)
+
+                # Update the call record in our database with proper datetime parsing
+                if call_data:
+                    call_data.call_state = response.call_state if hasattr(response, 'call_state') else None
+                    call_data.call_duration = int(response.call_duration) if hasattr(response,
+                                                                                     'call_duration') else None
+
+                    # Parse datetime strings properly
+                    if hasattr(response, 'answer_time') and response.answer_time:
+                        call_data.answer_time = parse_plivo_datetime(response.answer_time)
+
+                    if hasattr(response, 'end_time') and response.end_time:
+                        call_data.end_time = parse_plivo_datetime(response.end_time)
+
+                    if hasattr(response, 'initiation_time') and response.initiation_time:
+                        call_data.initiation_time = parse_plivo_datetime(response.initiation_time)
+
+                    call_data.hangup_cause = response.hangup_cause_name if hasattr(response,
+                                                                                   'hangup_cause_name') else None
+                    call_data.hangup_source = response.hangup_source if hasattr(response, 'hangup_source') else None
+
+                    # Store the full Plivo response
+                    plivo_data = {}
+                    for attr in dir(response):
+                        if not attr.startswith('_') and not callable(getattr(response, attr)):
+                            plivo_data[attr] = getattr(response, attr)
+
+                    call_data.plivo_data = json.dumps(plivo_data)
+                    db_session.commit()
+
+                    # If this is a campaign call, update the contact status
+                    if call_data.campaign_id:
+                        contact = db_session.query(CampaignContact).filter_by(
+                            call_uuid=call_uuid
+                        ).first()
+
+                        if contact and contact.status == 'calling':
+                            # Determine the new status based on call state
+                            new_status = 'completed'  # Default
+
+                            if response.call_state != 'ANSWER':
+                                if response.call_state == 'BUSY':
+                                    new_status = 'busy'
+                                elif response.call_state == 'NO_ANSWER':
+                                    new_status = 'no-answer'
+                                else:
+                                    new_status = 'failed'
+
+                            contact.status = new_status
+                            db_session.commit()
+
                 return jsonify({
                     "status": "success",
                     "call_status": "completed",
-                    "ultravox_call_id": ultravox_call_id,  # Include Ultravox call ID
+                    "ultravox_call_id": ultravox_call_id,
                     "details": {
                         "answer_time": response.answer_time if hasattr(response, 'answer_time') else None,
                         "bill_duration": response.bill_duration if hasattr(response, 'bill_duration') else None,
@@ -250,61 +484,105 @@ def get_call_status(call_uuid):
                     "status": "error",
                     "message": "Call not found in either live or completed calls"
                 }), 404
+            except Exception as e:
+                logger.error(f"Error getting completed call details: {str(e)}")
+                logger.error(traceback.format_exc())
+                return jsonify({
+                    "status": "error",
+                    "message": f"Error getting completed call details: {str(e)}"
+                }), 500
         except Exception as e:
             logger.error(f"Error getting live call: {str(e)}")
+            logger.error(traceback.format_exc())
             return jsonify({
                 "status": "error",
                 "message": f"Error getting live call: {str(e)}"
             }), 500
-
     except Exception as e:
         logger.error(f"Error in get_call_status: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({
             "status": "error",
             "message": str(e)
         }), 500
+    finally:
+        try:
+            close_db_session(db_session)
+        except:
+            pass
 
-
-# In api_controller.py - optimize the get_recent_calls function
 @api.route('/recent_calls', methods=['GET'])
 def get_recent_calls():
-    """Get a list of recent calls with optimized performance"""
+    """
+    Get a list of recent calls with pagination
+    Enhanced to use the CallLog table
+    """
     try:
-        # Initialize Plivo client
-        plivo_client = plivo.RestClient(PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN)
-
         # Get pagination parameters
-        limit = request.args.get('limit', '20')
-        offset = request.args.get('offset', '0')
+        limit = int(request.args.get('limit', '20'))
+        offset = int(request.args.get('offset', '0'))
 
-        # Use a more efficient query with fewer fields
-        response = plivo_client.calls.list(
-            limit=int(limit),
-            offset=int(offset),
-            subaccount=None  # Add any other filters that might help
-        )
+        db_session = get_db_session()
 
-        # Format the response with minimal processing
-        calls = []
-        for call in response:
-            calls.append({
+        # Query the CallLog table
+        total_count = db_session.query(CallLog).count()
+
+        calls_query = db_session.query(CallLog)
+
+        # Apply filtering if needed
+        campaign_id = request.args.get('campaign_id')
+        if campaign_id:
+            calls_query = calls_query.filter_by(campaign_id=int(campaign_id))
+
+        agent_id = request.args.get('agent_id')
+        if agent_id:
+            calls_query = calls_query.filter_by(agent_id=agent_id)
+
+        # Order by most recent first
+        calls_query = calls_query.order_by(CallLog.created_at.desc())
+
+        # Apply pagination
+        calls = calls_query.limit(limit).offset(offset).all()
+
+        # Format the response
+        formatted_calls = []
+        for call in calls:
+            formatted_call = {
                 "call_uuid": call.call_uuid,
+                "ultravox_id": call.ultravox_id,
                 "from_number": call.from_number,
                 "to_number": call.to_number,
-                "call_direction": call.call_direction,
-                "call_duration": call.call_duration,
                 "call_state": call.call_state,
-                "initiation_time": call.initiation_time,
-                "end_time": call.end_time if hasattr(call, 'end_time') else None
-            })
+                "call_duration": call.call_duration,
+                "initiation_time": call.initiation_time.isoformat() if call.initiation_time else None,
+                "answer_time": call.answer_time.isoformat() if call.answer_time else None,
+                "end_time": call.end_time.isoformat() if call.end_time else None,
+                "hangup_cause": call.hangup_cause,
+                "campaign_id": call.campaign_id,
+                "agent_id": call.agent_id
+            }
+
+            # If agent data is requested, include agent name
+            if call.agent_id:
+                agent = db_session.query(Agent).filter_by(agent_id=call.agent_id).first()
+                if agent:
+                    formatted_call["agent_name"] = agent.name
+
+            # If campaign data is requested, include campaign name
+            if call.campaign_id:
+                campaign = db_session.query(Campaign).filter_by(campaign_id=call.campaign_id).first()
+                if campaign:
+                    formatted_call["campaign_name"] = campaign.campaign_name
+
+            formatted_calls.append(formatted_call)
 
         return jsonify({
             "status": "success",
-            "calls": calls,
+            "calls": formatted_calls,
             "meta": {
-                "limit": int(limit),
-                "offset": int(offset),
-                "total_count": len(calls)  # This is just for the current page
+                "limit": limit,
+                "offset": offset,
+                "total_count": total_count
             }
         })
     except Exception as e:
@@ -313,23 +591,114 @@ def get_recent_calls():
             "status": "error",
             "message": str(e)
         }), 500
+    finally:
+        try:
+            close_db_session(db_session)
+        except:
+            pass
+
+
+@api.route('/call_details/<call_uuid>', methods=['GET'])
+def get_call_details(call_uuid):
+    """
+    Get detailed information about a specific call
+    """
+    try:
+        db_session = get_db_session()
+
+        # Get the call from our database
+        call = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        if not call:
+            return jsonify({
+                "status": "error",
+                "message": f"Call with UUID {call_uuid} not found"
+            }), 404
+
+        # Build the response with comprehensive information
+        call_details = call.to_dict()
+
+        # Add agent information if available
+        if call.agent_id:
+            agent = db_session.query(Agent).filter_by(agent_id=call.agent_id).first()
+            if agent:
+                call_details["agent"] = {
+                    "id": agent.agent_id,
+                    "name": agent.name
+                }
+
+        # Add campaign information if available
+        if call.campaign_id:
+            campaign = db_session.query(Campaign).filter_by(campaign_id=call.campaign_id).first()
+            if campaign:
+                call_details["campaign"] = {
+                    "id": campaign.campaign_id,
+                    "name": campaign.campaign_name
+                }
+
+        # Include Plivo data if stored
+        if call.plivo_data:
+            call_details["plivo_data"] = json.loads(call.plivo_data)
+
+        # Include Ultravox data if stored
+        if call.ultravox_data:
+            call_details["ultravox_data"] = json.loads(call.ultravox_data)
+
+        return jsonify({
+            "status": "success",
+            "call": call_details
+        })
+
+    except Exception as e:
+        logger.error(f"Error in get_call_details: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        try:
+            close_db_session(db_session)
+        except:
+            pass
 
 
 @api.route('/call_mapping/<call_uuid>', methods=['GET'])
 def get_call_mapping(call_uuid):
     """
     Get the mapping between Plivo call_uuid and Ultravox call_id
+    Enhanced to use the CallLog table first
     """
     try:
         db_session = get_db_session()
 
-        # Look up the mapping in the database
+        # First try to get the mapping from CallLog
+        call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        if call_log and call_log.ultravox_id:
+            return jsonify({
+                "status": "success",
+                "mapping": {
+                    "plivo_call_uuid": call_uuid,
+                    "ultravox_call_id": call_log.ultravox_id,
+                    "recipient_phone_number": call_log.to_number,
+                    "plivo_phone_number": call_log.from_number,
+                    "source": "call_log"
+                }
+            })
+
+        # Fall back to legacy mapping if not found in CallLog
         call_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
 
         if call_mapping:
             return jsonify({
                 "status": "success",
-                "mapping": call_mapping.to_dict()
+                "mapping": {
+                    "plivo_call_uuid": call_mapping.plivo_call_uuid,
+                    "ultravox_call_id": call_mapping.ultravox_call_id,
+                    "recipient_phone_number": call_mapping.recipient_phone_number,
+                    "plivo_phone_number": call_mapping.plivo_phone_number,
+                    "source": "call_mapping"
+                }
             })
         else:
             return jsonify({
@@ -343,44 +712,67 @@ def get_call_mapping(call_uuid):
             "message": str(e)
         }), 500
     finally:
-        close_db_session(db_session)
+        try:
+            close_db_session(db_session)
+        except:
+            pass
 
 
 @api.route('/set_call_mapping/<call_uuid>/<ultravox_call_id>', methods=['GET'])
 def set_call_mapping(call_uuid, ultravox_call_id):
     """
     Temporary endpoint to set a call mapping for testing
+    Enhanced to update CallLog as well
     """
     try:
         db_session = get_db_session()
 
-        # Check if mapping already exists
+        # Check if call exists in CallLog
+        call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        if call_log:
+            # Update the Ultravox ID
+            call_log.ultravox_id = ultravox_call_id
+            logger.info(f"Updated CallLog: {call_uuid} -> {ultravox_call_id}")
+        else:
+            # Create a new CallLog entry
+            new_call = CallLog(
+                call_uuid=call_uuid,
+                ultravox_id=ultravox_call_id,
+                to_number="Unknown",
+                from_number="Unknown",
+                initiation_time=datetime.now()
+            )
+            db_session.add(new_call)
+            logger.info(f"Created new CallLog: {call_uuid} -> {ultravox_call_id}")
+
+        # Check if mapping already exists in legacy table
         existing_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
 
         if existing_mapping:
             existing_mapping.ultravox_call_id = ultravox_call_id
-            db_session.commit()
-            logger.info(f"Updated mapping: {call_uuid} -> {ultravox_call_id}")
-            return jsonify({
-                "status": "success",
-                "message": f"Updated mapping for call UUID: {call_uuid}"
-            })
+            logger.info(f"Updated legacy mapping: {call_uuid} -> {ultravox_call_id}")
         else:
-            # Create new mapping
+            # Create new mapping in legacy table
             new_mapping = CallMapping(
                 plivo_call_uuid=call_uuid,
                 ultravox_call_id=ultravox_call_id,
                 recipient_phone_number="Unknown",
                 plivo_phone_number="Unknown"
             )
-
             db_session.add(new_mapping)
-            db_session.commit()
-            logger.info(f"Created mapping: {call_uuid} -> {ultravox_call_id}")
-            return jsonify({
-                "status": "success",
-                "message": f"Created mapping for call UUID: {call_uuid}"
-            })
+            logger.info(f"Created legacy mapping: {call_uuid} -> {ultravox_call_id}")
+
+        db_session.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": f"Updated mapping for call UUID: {call_uuid}",
+            "mapping": {
+                "plivo_call_uuid": call_uuid,
+                "ultravox_call_id": ultravox_call_id
+            }
+        })
     except Exception as e:
         logger.error(f"Error setting call mapping: {str(e)}")
         return jsonify({
@@ -388,4 +780,7 @@ def set_call_mapping(call_uuid, ultravox_call_id):
             "message": str(e)
         }), 500
     finally:
-        close_db_session(db_session)
+        try:
+            close_db_session(db_session)
+        except:
+            pass

@@ -1,39 +1,51 @@
 ultravoxcalls/
 │
 ├── backend/
-│   ├── plivo_server.py            # Main Flask application
-│   ├── api_controller.py          # API endpoints for Plivo
-│   ├── analysis_controller.py     # Controller for analysis features (updated with audio proxy)
+│   ├── plivo_server.py            # Main Flask application (updated with new controller registrations)
+│   ├── api_controller.py          # API endpoints for Plivo (updated with database integration)
+│   ├── analysis_controller.py     # Controller for analysis features (updated with database caching)
+│   ├── agent_controller.py        # NEW: Controller for agent management
+│   ├── phone_controller.py        # NEW: Controller for saved phone numbers
 │   ├── campaign_controller.py     # NEW: Controller for campaign management
 │   ├── utils.py                   # Utility functions
-│   ├── models.py                  # Database models (updated with Campaign models)
-│   ├── database.py                # Database setup and session management
+│   ├── models.py                  # Database models (completely overhauled)
+│   ├── database.py                # Database setup and session management (updated with migration support)
 │   ├── config.py                  # Configuration and constants
-│   ├── requirements.txt           # Python dependencies (updated with OpenAI)
-│   └── calls.db                   # SQLite database file
+│   ├── requirements.txt           # Python dependencies (updated with new libraries)
+│   ├── calls.db                   # SQLite database file
+│   ├── alembic.ini                # NEW: Alembic migration configuration
+│   ├── migrations/                # NEW: Database migrations directory
+│   │   ├── env.py                 # Migration environment configuration
+│   │   ├── README                 # Migration readme
+│   │   ├── script.py.mako         # Migration script template
+│   │   └── versions/              # Migration version scripts
+│   └── logs/                      # Application logs
+│       ├── api_controller.log     # API logs
+│       ├── plivo_server.log       # Server logs
+│       └── analysis_controller.log# Analysis logs
 │
 ├── frontend/
 │   ├── public/
-│   │   ├── index.html             # Updated with modern fonts
+│   │   ├── index.html             # HTML template
 │   │   └── assets/                # Static assets
 │   ├── src/
-│   │   ├── App.jsx                # Main application (updated with campaign route)
+│   │   ├── App.jsx                # Main application (updated to use API instead of localStorage)
 │   │   ├── App.css                # Global styles with animations
 │   │   ├── index.js               # Entry point
-│   │   ├── index.css              # Global styles with custom scrollbar and Tailwind
+│   │   ├── index.css              # Global styles
 │   │   ├── components/
-│   │   │   ├── Dashboard.jsx      # Dashboard with fixed "View all calls" button
+│   │   │   ├── Dashboard.jsx      # Dashboard component
 │   │   │   ├── Sidebar.jsx        # Enhanced sidebar with campaign navigation
-│   │   │   ├── AgentSelector.jsx  # Agent selection modal
-│   │   │   ├── AgentForm.jsx      # Agent form with expanded duration options
-│   │   │   ├── NewCallForm.jsx    # Improved call form with number dropdowns
-│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring (fixed Analysis button)
+│   │   │   ├── AgentSelector.jsx  # Agent selection modal (updated to use API)
+│   │   │   ├── AgentForm.jsx      # Agent form with expanded options (updated to use API)
+│   │   │   ├── NewCallForm.jsx    # Improved call form (updated to use API for phone numbers)
+│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring
 │   │   │   ├── CallDetails.jsx    # Call details view
-│   │   │   ├── RecentCalls.jsx    # Call history with pagination (improved)
-│   │   │   ├── Analysis.jsx       # Enhanced call analysis component with timestamp fixes
-│   │   │   ├── EntityAnalysis.jsx # NEW: OpenAI-powered entity extraction
-│   │   │   ├── WaveformPlayer.jsx # NEW: Audio visualization with waveform
-│   │   │   ├── CampaignManager.jsx # NEW: Campaign management interface
+│   │   │   ├── RecentCalls.jsx    # Call history with pagination (updated to use API)
+│   │   │   ├── Analysis.jsx       # Enhanced call analysis component
+│   │   │   ├── EntityAnalysis.jsx # OpenAI-powered entity extraction
+│   │   │   ├── WaveformPlayer.jsx # Audio visualization with waveform
+│   │   │   ├── CampaignManager.jsx # Campaign management interface
 │   │   │   └── ui/                # UI component library
 │   │   │       ├── Card.jsx       # Reusable card component
 │   │   │       ├── Button.jsx     # Button component
@@ -45,8 +57,8 @@ ultravoxcalls/
 │   │   │       ├── Pagination.jsx # Pagination component
 │   │   │       └── TabButton.jsx  # Tab navigation component
 │   │   ├── utils/
-│   │   │   ├── formatters.js      # Date and time formatting utilities
-│   │   │   └── api.js             # API client functions
+│   │   │   ├── api.js             # NEW: API client functions for backend integration
+│   │   │   └── formatters.js      # Date and time formatting utilities
 │   │   ├── contexts/
 │   │   │   └── ThemeContext.js    # Theme management (future)
 │   │   └── hooks/
@@ -54,4 +66,4 @@ ultravoxcalls/
 │   ├── package.json               # Updated with papaparse
 │   ├── tailwind.config.js         # Updated with animations and effects
 │   └── postcss.config.js
-└── CHANGELOG.md                   # Updated with v1.8.0 changes
+└── CHANGELOG.md                   # Updated with v1.9.1 changes

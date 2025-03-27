@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle,
     AlertCircle, Tag, MessageSquare, FileAudio
@@ -7,18 +7,48 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import Pagination from './ui/Pagination';
+import { getRecentCalls } from '../utils/api';
 
 const RecentCalls = ({
-                         calls,
-                         loading,
-                         onRefresh,
-                         onViewDetails,
-                         onViewAnalysis,
-                         currentPage,
-                         callsPerPage,
-                         totalCalls,
-                         paginate
-                     }) => {
+    onViewDetails,
+    onViewAnalysis
+}) => {
+    // State for calls data
+    const [calls, setCalls] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [callsPerPage] = useState(20);
+    const [totalCalls, setTotalCalls] = useState(0);
+
+    // Fetch calls on component mount and when pagination changes
+    useEffect(() => {
+        fetchCalls();
+    }, [currentPage]);
+
+    // Function to fetch calls
+    const fetchCalls = async () => {
+        setLoading(true);
+        try {
+            const offset = (currentPage - 1) * callsPerPage;
+            const response = await getRecentCalls(callsPerPage, offset);
+
+            if (response.status === 'success') {
+                setCalls(response.calls);
+                setTotalCalls(response.meta.total_count);
+            } else {
+                setError(response.message || 'Failed to fetch recent calls');
+            }
+        } catch (error) {
+            console.error('Error fetching recent calls:', error);
+            setError('An error occurred while fetching recent calls');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Helper function to format call status
     const getStatusBadge = (status) => {
         if (status === 'ANSWER') {
@@ -53,7 +83,7 @@ const RecentCalls = ({
             return <Badge variant="info" pill>
                 <div className="flex items-center">
                     <Info size={12} className="mr-1"/>
-                    {status}
+                    {status || 'Unknown'}
                 </div>
             </Badge>;
         }
@@ -67,23 +97,17 @@ const RecentCalls = ({
     };
 
     // Helper to format campaign badge
-    const getCampaignBadge = (campaign) => {
-        if (campaign === 'General') {
+    const getCampaignBadge = (campaignName) => {
+        if (!campaignName) {
             return <Badge variant="default">General</Badge>;
         } else {
             return <Badge variant="purple" glow>
                 <div className="flex items-center">
                     <Tag size={12} className="mr-1"/>
-                    {campaign}
+                    {campaignName}
                 </div>
             </Badge>;
         }
-    };
-
-    // Helper to determine if a call has available data
-    const hasData = (call) => {
-        // Make all calls with a call_uuid clickable
-        return !!call.call_uuid;
     };
 
     // Calculate pagination metrics
@@ -95,13 +119,12 @@ const RecentCalls = ({
 
     return (
         <Card className="overflow-hidden">
-            <div
-                className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
+            <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
                 <h2 className="text-xl font-semibold text-white">Call History</h2>
                 <Button
                     variant="secondary"
                     size="sm"
-                    onClick={onRefresh}
+                    onClick={fetchCalls}
                     disabled={loading}
                     icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''}/>}
                 >
@@ -113,6 +136,21 @@ const RecentCalls = ({
                 <div className="p-8 text-center text-gray-400">
                     <RefreshCw size={24} className="mx-auto mb-2 animate-spin"/>
                     <p>Loading calls...</p>
+                </div>
+            ) : error ? (
+                <div className="p-8 text-center text-gray-400">
+                    <AlertCircle size={24} className="mx-auto mb-2 text-red-400"/>
+                    <p className="text-white mb-2">Error loading calls</p>
+                    <p className="text-sm">{error}</p>
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        className="mt-4"
+                        onClick={fetchCalls}
+                        icon={<RefreshCw size={14} />}
+                    >
+                        Retry
+                    </Button>
                 </div>
             ) : calls.length === 0 ? (
                 <div className="p-8 text-center text-gray-400">
@@ -131,7 +169,7 @@ const RecentCalls = ({
                             <Pagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}
-                                onPageChange={paginate}
+                                onPageChange={setCurrentPage}
                             />
                         </div>
                     )}
@@ -174,7 +212,7 @@ const RecentCalls = ({
                                     {getStatusBadge(call.call_state)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    {getCampaignBadge(call.campaign || 'General')}
+                                    {getCampaignBadge(call.campaign_name)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex space-x-2">
@@ -192,6 +230,7 @@ const RecentCalls = ({
                                             size="sm"
                                             onClick={() => onViewAnalysis(call)}
                                             icon={<BarChart size={14}/>}
+                                            disabled={!call.ultravox_id}
                                         >
                                             Analysis
                                         </Button>
@@ -211,7 +250,7 @@ const RecentCalls = ({
                             <Pagination
                                 currentPage={currentPage}
                                 totalPages={totalPages}
-                                onPageChange={paginate}
+                                onPageChange={setCurrentPage}
                             />
                         </div>
                     )}

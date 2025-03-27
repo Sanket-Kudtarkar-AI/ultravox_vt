@@ -1,759 +1,397 @@
 import React, {useState, useEffect} from 'react';
-import {Phone, BarChart, Bell, CheckCircle, XCircle, AlertTriangle, X} from 'lucide-react';
+import {v4 as uuidv4} from 'uuid';
 import './App.css';
-import CallDetails from './components/CallDetails';
-import NewCallForm from './components/NewCallForm';
-import RecentCalls from './components/RecentCalls';
-import CallStatus from './components/CallStatus';
 import Sidebar from './components/Sidebar';
-import AgentForm from './components/AgentForm';
-import AgentSelector from './components/AgentSelector';
-import Analysis from './components/Analysis';
 import Dashboard from './components/Dashboard';
-import PageLayout from './components/ui/PageLayout';
-import Button from './components/ui/Button';
-import Modal from './components/ui/Modal';
+import NewCallForm from './components/NewCallForm';
+import CallStatus from './components/CallStatus';
+import RecentCalls from './components/RecentCalls';
+import CallDetails from './components/CallDetails';
+import Analysis from './components/Analysis';
+import AgentSelector from './components/AgentSelector';
+import AgentForm from './components/AgentForm';
 import CampaignManager from './components/CampaignManager';
-
-// Generate a unique ID
-const generateId = () => `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+import {
+    getAgents,
+    getPhoneNumbers,
+    savePhoneNumber,
+    updateNumberUsage,
+    deletePhoneNumber,
+    getServerStatus
+} from './utils/api';
 
 function App() {
-    // App state
-    const [currentView, setCurrentView] = useState('dashboard');
-    const [activeCall, setActiveCall] = useState(null);
-    const [recentCalls, setRecentCalls] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [notification, setNotification] = useState(null);
+    // Server Status
+    const [serverStatus, setServerStatus] = useState('checking');
 
-    // Agent management state
+    // Current view/page
+    const [currentView, setCurrentView] = useState('dashboard');
+
+    // Agents state
     const [agents, setAgents] = useState([]);
     const [selectedAgentId, setSelectedAgentId] = useState(null);
-    const [currentAgent, setCurrentAgent] = useState(null);
-    const [isAgentFormOpen, setIsAgentFormOpen] = useState(false);
-    const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
-    const [isEditingAgent, setIsEditingAgent] = useState(false);
+    const [agentToEdit, setAgentToEdit] = useState(null);
+    const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+    const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
+    const [isLoadingAgents, setIsLoadingAgents] = useState(true);
 
-    // Call recipient history
+    // Phone numbers state
     const [savedRecipients, setSavedRecipients] = useState([]);
-
-    // Call from number history
     const [savedFromNumbers, setSavedFromNumbers] = useState([]);
+    const [isLoadingPhoneNumbers, setIsLoadingPhoneNumbers] = useState(true);
 
-    // Server status monitoring
-    const [serverStatus, setServerStatus] = useState('unknown');
+    // Call state
+    const [activeCall, setActiveCall] = useState(null);
+    const [selectedCall, setSelectedCall] = useState(null);
+    const [isLoadingCall, setIsLoadingCall] = useState(false);
+    const [callForAnalysis, setCallForAnalysis] = useState(null);
 
-    // Call analysis state
-    const [callAnalysisData, setCallAnalysisData] = useState(null);
-
-    // Pagination for call history
+    // Current page for pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const [callsPerPage, setCallsPerPage] = useState(20);
+    const [callsPerPage] = useState(20);
 
-    // API base URL - update this to your actual API endpoint
-    const API_BASE_URL = 'http://localhost:5000/api';
-
-
-    // Load agents and recipients from localStorage on component mount
+    // Check server status on component mount and at regular intervals
     useEffect(() => {
-        try {
-            // Load agents with proper error handling
-            const savedAgents = localStorage.getItem('agents');
-            if (savedAgents) {
-                const parsedAgents = JSON.parse(savedAgents);
-                if (Array.isArray(parsedAgents) && parsedAgents.length > 0) {
-                    setAgents(parsedAgents);
+        const checkServerStatus = async () => {
+            const status = await getServerStatus();
+            setServerStatus(status.status);
+        };
 
-                    // Set the oldest agent as default selected if none is currently selected
-                    if (!selectedAgentId) {
-                        const oldestAgent = [...parsedAgents].sort((a, b) =>
-                            new Date(a.created_at) - new Date(b.created_at)
-                        )[0];
-                        if (oldestAgent) {
-                            setSelectedAgentId(oldestAgent.id);
-                        }
-                    } else {
-                        // Check if the selected agent still exists after reloading
-                        const agentExists = parsedAgents.some(agent => agent.id === selectedAgentId);
-                        if (!agentExists) {
-                            // Reset selectedAgentId if the agent no longer exists
-                            setSelectedAgentId(parsedAgents[0]?.id || null);
-                        }
-                    }
-                } else {
-                    // If no agents exist, ensure selectedAgentId is null
-                    setSelectedAgentId(null);
-                }
-            } else {
-                // If no agents are stored, ensure selectedAgentId is null
-                setSelectedAgentId(null);
-            }
+        // Check immediately on component mount
+        checkServerStatus();
 
-            // Load saved recipients with proper error handling
-            const savedRecipientsList = localStorage.getItem('recipients');
-            if (savedRecipientsList) {
-                try {
-                    const parsedRecipients = JSON.parse(savedRecipientsList);
-                    if (Array.isArray(parsedRecipients)) {
-                        // Ensure we have unique values
-                        const uniqueRecipients = Array.from(new Set(
-                            parsedRecipients.map(num => num && typeof num === 'string' ? num.trim() : '')
-                        )).filter(Boolean); // Remove any empty strings
-                        setSavedRecipients(uniqueRecipients);
-                    } else {
-                        // If not an array, initialize with an empty array
-                        setSavedRecipients([]);
-                    }
-                } catch (error) {
-                    console.error('Error parsing saved recipients:', error);
-                    setSavedRecipients([]);
-                }
-            }
+        // Then check every 5 seconds
+        const intervalId = setInterval(checkServerStatus, 5000);
 
-            // Load saved from numbers with proper error handling
-            const savedFromNumbersList = localStorage.getItem('fromNumbers');
-            if (savedFromNumbersList) {
-                try {
-                    const parsedFromNumbers = JSON.parse(savedFromNumbersList);
-                    if (Array.isArray(parsedFromNumbers)) {
-                        // Ensure we have unique values
-                        const uniqueFromNumbers = Array.from(new Set(
-                            parsedFromNumbers.map(num => num && typeof num === 'string' ? num.trim() : '')
-                        )).filter(Boolean); // Remove any empty strings
-                        setSavedFromNumbers(uniqueFromNumbers);
-                    } else {
-                        // If not an array, initialize with an empty array
-                        setSavedFromNumbers([]);
-                    }
-                } catch (error) {
-                    console.error('Error parsing saved from numbers:', error);
-                    setSavedFromNumbers([]);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading saved data:', error);
-            setSelectedAgentId(null); // Reset on error
-        }
-    }, []);
-
-    // Save agents to localStorage when they change
-    useEffect(() => {
-        try {
-            if (agents && agents.length > 0) {
-                localStorage.setItem('agents', JSON.stringify(agents));
-            }
-        } catch (error) {
-            console.error('Error saving agents to localStorage:', error);
-        }
-    }, [agents]);
-
-    // Save recipients to localStorage when they change
-    useEffect(() => {
-        try {
-            if (savedRecipients && savedRecipients.length > 0) {
-                localStorage.setItem('recipients', JSON.stringify(savedRecipients));
-            }
-        } catch (error) {
-            console.error('Error saving recipients to localStorage:', error);
-        }
-    }, [savedRecipients]);
-
-    // Save from numbers to localStorage when they change
-    useEffect(() => {
-        try {
-            if (savedFromNumbers && savedFromNumbers.length > 0) {
-                localStorage.setItem('fromNumbers', JSON.stringify(savedFromNumbers));
-            }
-        } catch (error) {
-            console.error('Error saving from numbers to localStorage:', error);
-        }
-    }, [savedFromNumbers]);
-
-    // Server status check
-    const checkServerStatus = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL.replace('/api', '')}/status`, {
-                method: 'GET',
-                headers: {'Content-Type': 'application/json'},
-                cache: 'no-store',
-            });
-
-            if (response.ok) {
-                setServerStatus('online');
-            } else {
-                setServerStatus('offline');
-            }
-        } catch (err) {
-            setServerStatus('offline');
-        }
-    };
-
-    // Check server status every second
-    useEffect(() => {
-        checkServerStatus(); // Check immediately on mount
-        const intervalId = setInterval(checkServerStatus, 1000);
+        // Clean up interval on component unmount
         return () => clearInterval(intervalId);
     }, []);
 
-    // Fetch recent calls on component mount
+    // Fetch agents from API on component mount
     useEffect(() => {
-        if (currentView === 'dashboard' || currentView === 'recent-calls') {
-            fetchRecentCalls();
-        }
-    }, [currentView]);
+        const fetchAgents = async () => {
+            setIsLoadingAgents(true);
+            try {
+                const response = await getAgents();
+                if (response.status === 'success') {
+                    setAgents(response.agents);
 
-    // Agent management functions
-    const handleCreateAgent = () => {
-        setCurrentAgent(null);
-        setIsEditingAgent(false);
-        setIsAgentFormOpen(true);
-        setCurrentView('agent-form');
-    };
-
-    const handleEditAgent = (agentId) => {
-        const agent = agents.find(a => a.id === agentId);
-        if (agent) {
-            setCurrentAgent(agent);
-            setIsEditingAgent(true);
-            setIsAgentFormOpen(true);
-            setCurrentView('agent-form');
-        }
-    };
-
-    const handleDuplicateAgent = (agentId) => {
-        const agent = agents.find(a => a.id === agentId);
-        if (agent) {
-            const duplicateAgent = {
-                ...agent,
-                id: generateId(),
-                name: `${agent.name} (Copy)`,
-                created_at: new Date().toISOString()
-            };
-            setAgents([...agents, duplicateAgent]);
-            showNotification('success', `Agent "${agent.name}" duplicated successfully`);
-        }
-    };
-
-    const handleDeleteAgent = (agentId) => {
-        if (window.confirm('Are you sure you want to delete this agent?')) {
-            setAgents(prevAgents => {
-                const updatedAgents = prevAgents.filter(a => a.id !== agentId);
-
-                // If we're deleting the currently selected agent
-                if (selectedAgentId === agentId) {
-                    // Select another agent if available, otherwise set to null
-                    if (updatedAgents.length > 0) {
-                        setSelectedAgentId(updatedAgents[0].id);
-                    } else {
-                        setSelectedAgentId(null);
+                    // If we have agents and none is selected, select the first one
+                    if (response.agents.length > 0 && !selectedAgentId) {
+                        setSelectedAgentId(response.agents[0].agent_id);
                     }
+                } else {
+                    console.error('Error fetching agents:', response.message);
+                }
+            } catch (error) {
+                console.error('Error fetching agents:', error);
+            } finally {
+                setIsLoadingAgents(false);
+            }
+        };
+
+        fetchAgents();
+    }, []);
+
+    // Fetch saved phone numbers from API on component mount
+    useEffect(() => {
+        const fetchPhoneNumbers = async () => {
+            setIsLoadingPhoneNumbers(true);
+            try {
+                // Fetch recipient numbers
+                const recipientsResponse = await getPhoneNumbers('recipient');
+                if (recipientsResponse.status === 'success') {
+                    // Sort by last_used (newest first)
+                    const sortedRecipients = recipientsResponse.phone_numbers
+                        .sort((a, b) => new Date(b.last_used) - new Date(a.last_used))
+                        .map(number => number.phone_number);
+                    setSavedRecipients(sortedRecipients);
                 }
 
-                return updatedAgents;
-            });
-
-            showNotification('success', 'Agent deleted successfully');
-        }
-    };
-
-    const handleSaveAgent = (agent) => {
-        try {
-            if (isEditingAgent) {
-                // Update existing agent
-                const updatedAgents = agents.map(a => a.id === agent.id ? agent : a);
-                setAgents(updatedAgents);
-                showNotification('success', `Agent "${agent.name}" updated successfully`);
-            } else {
-                // Create new agent
-                const newAgent = {
-                    ...agent,
-                    id: generateId(),
-                    created_at: new Date().toISOString()
-                };
-                setAgents(prevAgents => {
-                    const newAgents = [...prevAgents, newAgent];
-                    // Immediately save to localStorage as a safeguard
-                    try {
-                        localStorage.setItem('agents', JSON.stringify(newAgents));
-                    } catch (error) {
-                        console.error('Error immediately saving agents to localStorage:', error);
-                    }
-                    return newAgents;
-                });
-                showNotification('success', `Agent "${agent.name}" created successfully`);
+                // Fetch from numbers
+                const fromResponse = await getPhoneNumbers('from');
+                if (fromResponse.status === 'success') {
+                    // Sort by last_used (newest first)
+                    const sortedFromNumbers = fromResponse.phone_numbers
+                        .sort((a, b) => new Date(b.last_used) - new Date(a.last_used))
+                        .map(number => number.phone_number);
+                    setSavedFromNumbers(sortedFromNumbers);
+                }
+            } catch (error) {
+                console.error('Error fetching saved phone numbers:', error);
+            } finally {
+                setIsLoadingPhoneNumbers(false);
             }
+        };
 
-            setIsAgentFormOpen(false);
-            setCurrentView('dashboard');
-        } catch (error) {
-            console.error('Error saving agent:', error);
-            showNotification('error', 'Error saving agent. Please try again.');
-        }
-    };
+        fetchPhoneNumbers();
+    }, []);
 
+    // Handle agent selection
     const handleSelectAgent = (agentId) => {
         if (agentId === null) {
-            setIsAgentSelectorOpen(true);
+            setIsAgentModalOpen(true);
         } else {
             setSelectedAgentId(agentId);
-            // Open the edit form when selecting an agent from the sidebar
-            const agent = agents.find(a => a.id === agentId);
-            if (agent) {
-                setCurrentAgent(agent);
-                setIsEditingAgent(true);
-                setIsAgentFormOpen(true);
-                setCurrentView('agent-form');
-            }
         }
     };
 
-    // Fetch recent calls
-    const fetchRecentCalls = async () => {
-        try {
-            setLoading(true);
-            // Increase the limit to fetch more calls (e.g., 100 instead of 20)
-            const response = await fetch(`${API_BASE_URL}/recent_calls?limit=20`);
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                setRecentCalls(data.calls);
-            } else {
-                setError(data.message || 'Failed to fetch recent calls');
-            }
-        } catch (err) {
-            setError('Error connecting to server. Please check your connection.');
-            console.error('Error fetching recent calls:', err);
-        } finally {
-            setLoading(false);
-        }
+    // Handle agent creation
+    const handleCreateAgent = () => {
+        setAgentToEdit(null);
+        setIsCreatingAgent(true);
     };
 
-    // Make a new call
-    const makeCall = async (callData) => {
-        try {
-            setLoading(true);
+    // Handle agent editing
+    const handleEditAgent = (agentId) => {
+        const agent = agents.find(a => a.agent_id === agentId);
+        setAgentToEdit(agent);
+        setIsCreatingAgent(true);
+    };
 
-            // Handle recipient number management
-            if (callData.recipient_phone_number) {
+    // Handle agent duplication
+    const handleDuplicateAgent = async (agentId) => {
+        // This should now call the API to duplicate
+        console.log('Duplicating agent:', agentId);
+        // API call would go here
+    };
+
+    // Handle agent deletion
+    const handleDeleteAgent = async (agentId) => {
+        // This should now call the API to delete
+        console.log('Deleting agent:', agentId);
+        // API call would go here
+    };
+
+    // Handle agent save (create or update)
+    const handleSaveAgent = async (agent) => {
+        // This should now call the API to save
+        console.log('Saving agent:', agent);
+        // API call would go here
+        setIsCreatingAgent(false);
+    };
+
+    // Handle adding a new recipient phone number
+    const handleAddRecipient = async (phoneNumber) => {
+        try {
+            const response = await savePhoneNumber({
+                phone_number: phoneNumber,
+                number_type: 'recipient'
+            });
+
+            if (response.status === 'success') {
+                // Update the savedRecipients state
                 setSavedRecipients(prev => {
-                    // Normalize the number to prevent duplicates with different formatting
-                    const normalizedNumber = callData.recipient_phone_number.trim();
-                    const numberExists = prev.some(num => num.trim().toLowerCase() === normalizedNumber.toLowerCase());
-
-                    // If it exists, filter it out before adding to the front
-                    let newRecipients = numberExists
-                        ? prev.filter(num => num.trim().toLowerCase() !== normalizedNumber.toLowerCase())
-                        : [...prev];
-
-                    // Add the new/used number to the front
-                    newRecipients = [normalizedNumber, ...newRecipients];
-
-                    // Limit the list to a reasonable size (e.g., 20 numbers)
-                    if (newRecipients.length > 20) {
-                        newRecipients = newRecipients.slice(0, 20);
+                    // Add to the beginning of the array if it doesn't exist
+                    if (!prev.includes(phoneNumber)) {
+                        return [phoneNumber, ...prev];
                     }
-
-                    // Save to localStorage safely
-                    try {
-                        localStorage.setItem('recipients', JSON.stringify(newRecipients));
-                    } catch (error) {
-                        console.error('Error saving recipients to localStorage:', error);
-                    }
-
-                    return newRecipients;
+                    return prev;
                 });
             }
+        } catch (error) {
+            console.error('Error saving recipient number:', error);
+        }
+    };
 
-            // Handle "from" number management
-            if (callData.plivo_phone_number) {
+    // Handle removing a recipient phone number
+    const handleRemoveRecipient = async (index) => {
+        try {
+            const phoneNumber = savedRecipients[index];
+
+            // Find the phone number ID by making a request to get it by number
+            const response = await getPhoneNumbers();
+
+            if (response.status === 'success') {
+                const numberToDelete = response.phone_numbers.find(
+                    num => num.phone_number === phoneNumber && num.number_type === 'recipient'
+                );
+
+                if (numberToDelete) {
+                    // Delete the phone number
+                    await deletePhoneNumber(numberToDelete.id);
+
+                    // Update the local state
+                    setSavedRecipients(prev => prev.filter((_, i) => i !== index));
+                }
+            }
+        } catch (error) {
+            console.error('Error removing recipient number:', error);
+        }
+    };
+
+    // Handle adding a new from phone number
+    const handleAddFromNumber = async (phoneNumber) => {
+        try {
+            const response = await savePhoneNumber({
+                phone_number: phoneNumber,
+                number_type: 'from'
+            });
+
+            if (response.status === 'success') {
+                // Update the savedFromNumbers state
                 setSavedFromNumbers(prev => {
-                    // Normalize the number to prevent duplicates
-                    const normalizedNumber = callData.plivo_phone_number.trim();
-                    const numberExists = prev.some(num => num.trim().toLowerCase() === normalizedNumber.toLowerCase());
-
-                    // If it exists, filter it out before adding to the front
-                    let newFromNumbers = numberExists
-                        ? prev.filter(num => num.trim().toLowerCase() !== normalizedNumber.toLowerCase())
-                        : [...prev];
-
-                    // Add the new/used number to the front
-                    newFromNumbers = [normalizedNumber, ...newFromNumbers];
-
-                    // Limit the list to a reasonable size
-                    if (newFromNumbers.length > 20) {
-                        newFromNumbers = newFromNumbers.slice(0, 20);
+                    // Add to the beginning of the array if it doesn't exist
+                    if (!prev.includes(phoneNumber)) {
+                        return [phoneNumber, ...prev];
                     }
-
-                    // Save to localStorage safely
-                    try {
-                        localStorage.setItem('fromNumbers', JSON.stringify(newFromNumbers));
-                    } catch (error) {
-                        console.error('Error saving from numbers to localStorage:', error);
-                    }
-
-                    return newFromNumbers;
+                    return prev;
                 });
             }
+        } catch (error) {
+            console.error('Error saving from number:', error);
+        }
+    };
 
-            // Format initial messages correctly for the API
-            const formattedInitialMessages = callData.initial_messages
-                ? callData.initial_messages
-                    .filter(msg => msg && msg.trim() !== '')
-                    .map(message => ({
-                        text: message,
-                        role: "assistant"
-                    }))
-                : [];
+    // Handle removing a from phone number
+    const handleRemoveFromNumber = async (index) => {
+        try {
+            const phoneNumber = savedFromNumbers[index];
 
-            // Prepare API call data with correctly formatted initial messages
-            const apiCallData = {
-                ...callData,
-                initial_messages: formattedInitialMessages
-            };
+            // Find the phone number ID by making a request to get it by number
+            const response = await getPhoneNumbers();
 
-            const response = await fetch(`${API_BASE_URL}/make_call`, {
+            if (response.status === 'success') {
+                const numberToDelete = response.phone_numbers.find(
+                    num => num.phone_number === phoneNumber && num.number_type === 'from'
+                );
+
+                if (numberToDelete) {
+                    // Delete the phone number
+                    await deletePhoneNumber(numberToDelete.id);
+
+                    // Update the local state
+                    setSavedFromNumbers(prev => prev.filter((_, i) => i !== index));
+                }
+            }
+        } catch (error) {
+            console.error('Error removing from number:', error);
+        }
+    };
+
+    // Handle initiating a call
+    const handleMakeCall = async (callData) => {
+        setIsLoadingCall(true);
+
+        // Add the agent ID if an agent is selected
+        if (selectedAgentId) {
+            callData.agent_id = selectedAgentId;
+        }
+
+        try {
+            // Make the API request to initiate the call
+            const response = await fetch('http://localhost:5000/api/make_call', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(apiCallData),
+                body: JSON.stringify(callData),
             });
 
             const data = await response.json();
 
             if (data.status === 'success') {
-                showNotification('success', `Call initiated successfully`);
-                setActiveCall({
-                    ...callData,
-                    call_uuid: data.call_uuid,
-                    ultravoxCallId: data.ultravox_call_id, // Store Ultravox call ID
-                    status: 'initiating', // More specific initial state
-                    timestamp: data.timestamp
-                });
+                // Update phone number usage
+                if (callData.recipient_phone_number) {
+                    await updateNumberUsage(callData.recipient_phone_number);
+                }
+
+                if (callData.plivo_phone_number) {
+                    await updateNumberUsage(callData.plivo_phone_number);
+                }
+
+                // Set the active call and switch to the call status view
+                setActiveCall(data);
                 setCurrentView('call-status');
             } else {
-                showNotification('error', data.message || 'Failed to initiate call');
+                console.error('Error making call:', data.message);
+                alert(`Error making call: ${data.message}`);
             }
-        } catch (err) {
-            showNotification('error', 'Error connecting to server. Please check your connection.');
-            console.error('Error making call:', err);
+        } catch (error) {
+            console.error('Error making call:', error);
+            alert('Error making call. Please try again.');
         } finally {
-            setLoading(false);
+            setIsLoadingCall(false);
         }
     };
 
-    // Get call status
-    const getCallStatus = async (callUuid) => {
-        if (!callUuid) return;
-
-        try {
-            setLoading(true);
-            const response = await fetch(`${API_BASE_URL}/call_status/${callUuid}`);
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                // Get the previous status to check for state transitions
-                const prevStatus = activeCall ? activeCall.status : null;
-
-                // Determine the new status based on API response
-                let newStatus = 'initiating';
-
-                if (data.details) {
-                    if (data.call_status === 'live' && data.details.call_status === 'in-progress') {
-                        newStatus = 'in-progress';
-                    } else if (data.details.call_state === 'ANSWER' ||
-                        data.details.hangup_cause_name === 'NORMAL_CLEARING') {
-                        newStatus = 'completed';
-                    } else if (data.details.call_state === 'BUSY') {
-                        newStatus = 'busy';
-                    } else if (data.details.call_state === 'FAILED') {
-                        newStatus = 'failed';
-                    } else if (data.details.call_state === 'NO_ANSWER') {
-                        newStatus = 'no-answer';
-                    } else if (data.call_status === 'live') {
-                        newStatus = 'ringing'; // Specific state for ringing
-                    }
-                }
-
-                // Set the updated call details
-                setActiveCall(prev => ({
-                    ...prev,
-                    details: data.details,
-                    call_status: data.call_status,
-                    status: newStatus, // Store our precise status
-                    lastUpdated: new Date().toISOString()
-                }));
-
-                // Only show notifications on meaningful state transitions
-                if (prevStatus !== newStatus) {
-                    if (newStatus === 'in-progress' && prevStatus !== 'completed') {
-                        showNotification('success', 'Call is now in progress');
-                    } else if (newStatus === 'completed' && prevStatus === 'in-progress') {
-                        showNotification('success', 'Call completed successfully');
-                    } else if (newStatus === 'busy') {
-                        showNotification('warning', 'Recipient was busy');
-                    } else if (newStatus === 'failed') {
-                        showNotification('error', 'Call failed');
-                    } else if (newStatus === 'no-answer') {
-                        showNotification('warning', 'No answer from recipient');
-                    }
-                }
-
-                return data;
-            } else {
-                console.error('Error in call status response:', data.message);
-                showNotification('error', data.message || 'Failed to fetch call status');
-                return null;
-            }
-        } catch (err) {
-            console.error('Error fetching call status:', err);
-            showNotification('error', 'Error connecting to server. Please check your connection.');
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // View call details
-    const viewCallDetails = (call) => {
-        setActiveCall(call);
+    // Handle viewing call details
+    const handleViewCallDetails = (call) => {
+        setSelectedCall(call);
         setCurrentView('call-details');
     };
 
-    // View call analysis
-    const viewCallAnalysis = (call) => {
-        setLoading(true);
-        console.log("VIEW ANALYSIS FUNCTION - Call data received:", JSON.stringify(call, null, 2));
-
-        // Look for the VT call ID using the new property name
-        const vtCallId = call.vtCallId;
-
-        console.log("VIEW ANALYSIS FUNCTION - VT Call ID from call object:", vtCallId);
-
-        if (vtCallId) {
-            // We have the correct VT Call ID from the CallStatus component
-            console.log("VIEW ANALYSIS FUNCTION - Using provided VT Call ID:", vtCallId);
-
-            setCallAnalysisData({
-                callUuid: call.call_uuid,
-                // Use the correct property name that the Analysis component expects
-                ultravoxCallId: vtCallId,
-                callDetails: call
-            });
-
-            setCurrentView('call-analysis');
-            setLoading(false);
-        } else if (call.mappingError) {
-            // There was an error fetching the mapping in CallStatus
-            console.warn("VIEW ANALYSIS FUNCTION - Mapping error:", call.mappingError);
-
-            setCallAnalysisData({
-                callUuid: call.call_uuid,
-                ultravoxCallId: null,
-                callDetails: call,
-                mappingNotFound: true,
-                error: call.mappingError
-            });
-
-            showNotification('warning', 'Limited analysis available: VT call ID mapping not found');
-            setCurrentView('call-analysis');
-            setLoading(false);
-        } else {
-            // As a fallback, try to fetch the mapping ourselves
-            console.log("VIEW ANALYSIS FUNCTION - No VT Call ID provided, fetching mapping");
-
-            fetch(`${API_BASE_URL}/call_mapping/${call.call_uuid}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Mapping API returned ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("VIEW ANALYSIS FUNCTION - Mapping API response:", data);
-
-                    if (data.status === 'success' && data.mapping && data.mapping.ultravox_call_id) {
-                        const mappedVtCallId = data.mapping.ultravox_call_id;
-                        console.log("VIEW ANALYSIS FUNCTION - Found VT Call ID from mapping:", mappedVtCallId);
-
-                        // Update activeCall with the VT Call ID if this is the active call
-                        if (activeCall && call.call_uuid === activeCall.call_uuid) {
-                            setActiveCall(prev => ({
-                                ...prev,
-                                vtCallId: mappedVtCallId
-                            }));
-                        }
-
-                        setCallAnalysisData({
-                            callUuid: call.call_uuid,
-                            ultravoxCallId: mappedVtCallId,
-                            callDetails: call
-                        });
-                    } else {
-                        console.warn("VIEW ANALYSIS FUNCTION - No valid mapping found in response");
-
-                        setCallAnalysisData({
-                            callUuid: call.call_uuid,
-                            ultravoxCallId: null,
-                            callDetails: call,
-                            mappingNotFound: true
-                        });
-
-                        showNotification('warning', 'Limited analysis available: VT call ID mapping not found');
-                    }
-
-                    setCurrentView('call-analysis');
-                })
-                .catch(err => {
-                    console.error("VIEW ANALYSIS FUNCTION - Error fetching mapping:", err);
-
-                    setCallAnalysisData({
-                        callUuid: call.call_uuid,
-                        ultravoxCallId: null,
-                        callDetails: call,
-                        mappingNotFound: true,
-                        error: err.message
-                    });
-
-                    setCurrentView('call-analysis');
-                    showNotification('error', `Error retrieving call analysis data: ${err.message}`);
-                })
-                .finally(() => {
-                    setLoading(false);
-                });
-        }
+    // Handle viewing call analysis
+    const handleViewCallAnalysis = (call) => {
+        setCallForAnalysis(call);
+        setCurrentView('call-analysis');
     };
 
-    // Display notification
-    const showNotification = (type, message) => {
-        const notificationId = Date.now();
-        setNotification({type, message, id: notificationId});
-        // Clear notification after 5 seconds
-        setTimeout(() => {
-            setNotification(prev => prev && prev.id === notificationId ? null : prev);
-        }, 5000);
-    };
-
-    // Handle pagination
-    const indexOfLastCall = currentPage * callsPerPage;
-    const indexOfFirstCall = indexOfLastCall - callsPerPage;
-    const currentCalls = recentCalls.slice(indexOfFirstCall, indexOfLastCall);
-
-    // Change page
-    const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-    // Show all calls
-    const handleViewAllCalls = () => {
-        setCurrentView('recent-calls');
-    };
-
-    // Render content based on current view
-    const renderContent = () => {
+    // Render the main content based on the current view
+    const renderMainContent = () => {
         switch (currentView) {
             case 'dashboard':
                 return (
                     <Dashboard
-                        recentCalls={recentCalls}
+                        recentCalls={[]} // This would now be fetched from the API as needed
                         agents={agents}
                         onCreateAgent={handleCreateAgent}
-                        onSelectAgent={handleSelectAgent}
-                        onViewDetails={viewCallDetails}
+                        onSelectAgent={handleEditAgent}
+                        onViewDetails={handleViewCallDetails}
                         setCurrentView={setCurrentView}
-                        onViewAllCalls={handleViewAllCalls}
                     />
                 );
-
             case 'new-call':
                 return (
-                    <PageLayout
-                        title="Make a New Call"
-                        subtitle="Start a new AI-powered call with your selected agent"
-                    >
-                        <NewCallForm
-                            onSubmit={makeCall}
-                            loading={loading}
-                            agents={agents}
-                            selectedAgentId={selectedAgentId}
-                            onSelectAgent={handleSelectAgent}
-                            savedRecipients={savedRecipients}
-                            savedFromNumbers={savedFromNumbers}
-                            onRemoveRecipient={(index) => {
-                                const newList = [...savedRecipients];
-                                newList.splice(index, 1);
-                                setSavedRecipients(newList);
-                                localStorage.setItem('recipients', JSON.stringify(newList));
-                            }}
-                            onRemoveFromNumber={(index) => {
-                                const newList = [...savedFromNumbers];
-                                newList.splice(index, 1);
-                                setSavedFromNumbers(newList);
-                                localStorage.setItem('fromNumbers', JSON.stringify(newList));
-                            }}
-                        />
-                    </PageLayout>
-                );
-
-            case 'agent-form':
-                return (
-                    <AgentForm
-                        agent={currentAgent}
-                        isEditing={isEditingAgent}
-                        onSave={handleSaveAgent}
-                        onCancel={() => setCurrentView('dashboard')}
-                        loading={loading}
+                    <NewCallForm
+                        onSubmit={handleMakeCall}
+                        loading={isLoadingCall}
+                        agents={agents}
+                        selectedAgentId={selectedAgentId}
+                        onSelectAgent={handleSelectAgent}
+                        savedRecipients={savedRecipients}
+                        savedFromNumbers={savedFromNumbers}
+                        onRemoveRecipient={handleRemoveRecipient}
+                        onRemoveFromNumber={handleRemoveFromNumber}
+                        onAddRecipient={handleAddRecipient}
+                        onAddFromNumber={handleAddFromNumber}
                     />
                 );
-
             case 'call-status':
-                return activeCall && (
-                    <PageLayout
-                        title="Call Status"
-                        subtitle="Monitor your active call"
-                        actions={
-                            <>
-                                <Button
-                                    onClick={() => viewCallAnalysis(activeCall)}
-                                    variant="primary"
-                                    icon={<BarChart size={18}/>}
-                                >
-                                    View Analysis
-                                </Button>
-                                <Button
-                                    onClick={() => setCurrentView('new-call')}
-                                    variant="secondary"
-                                    icon={<Phone size={18}/>}
-                                >
-                                    New Call
-                                </Button>
-                            </>
-                        }
-                    >
-                        <CallStatus
-                            call={activeCall}
-                            onRefreshStatus={() => getCallStatus(activeCall.call_uuid)}
-                            loading={loading}
-                            onViewAnalysis={(call) => viewCallAnalysis(call)}  // Fix this line
-                        />
-                    </PageLayout>
+                return (
+                    <CallStatus
+                        call={activeCall}
+                        onRefreshStatus={() => {/* Implement refresh */
+                        }}
+                        loading={false}
+                        onViewAnalysis={handleViewCallAnalysis}
+                    />
                 );
-
-
             case 'recent-calls':
                 return (
-                    <PageLayout title="Recent Calls" subtitle="View your call history">
-                        <RecentCalls
-                            calls={currentCalls}
-                            loading={loading}
-                            onRefresh={fetchRecentCalls}
-                            onViewDetails={viewCallDetails}
-                            onViewAnalysis={viewCallAnalysis}  // Make sure this is the correct function
-                            currentPage={currentPage}
-                            callsPerPage={callsPerPage}
-                            totalCalls={recentCalls.length}
-                            paginate={paginate}
-                        />
-                    </PageLayout>
+                    <RecentCalls
+                        onViewDetails={handleViewCallDetails}
+                        onViewAnalysis={handleViewCallAnalysis}
+                    />
+                );
+            case 'call-details':
+                return (
+                    <CallDetails
+                        call={selectedCall}
+                        onRefreshStatus={() => {/* Implement refresh */
+                        }}
+                        loading={false}
+                        onViewAnalysis={handleViewCallAnalysis}
+                    />
+                );
+            case 'call-analysis':
+                return (
+                    <Analysis
+                        callId={callForAnalysis?.ultravox_id || callForAnalysis?.vtCallId}
+                        callUuid={callForAnalysis?.call_uuid}
+                        onClose={() => setCurrentView('recent-calls')}
+                        serverStatus={serverStatus}
+                    />
                 );
             case 'campaign-manager':
                 return (
@@ -762,221 +400,16 @@ function App() {
                         onBack={() => setCurrentView('dashboard')}
                         onCreateAgent={handleCreateAgent}
                         savedFromNumbers={savedFromNumbers}
-                        API_BASE_URL={API_BASE_URL}
+                        API_BASE_URL="http://localhost:5000/api"
                     />
                 );
-
-            case 'call-details':
-                return activeCall && (
-                    <PageLayout
-                        title="Call Details"
-                        subtitle={`Call to ${activeCall.to_number || activeCall.recipient_phone_number}`}
-                        onBack={() => setCurrentView('recent-calls')}
-                    >
-                        <CallDetails
-                            call={activeCall}
-                            onRefreshStatus={() => getCallStatus(activeCall.call_uuid)}
-                            loading={loading}
-                            onViewAnalysis={viewCallAnalysis}
-                        />
-                    </PageLayout>
-                );
-
-            case 'call-analysis':
-                return callAnalysisData && (
-                    <Analysis
-                        callId={callAnalysisData.ultravoxCallId}
-                        callUuid={callAnalysisData.callUuid}
-                        onClose={() => setCurrentView('recent-calls')}
-                        serverStatus={serverStatus}
-                    />
-                );
-
-            case 'settings':
-                return (
-                    <PageLayout title="Settings" subtitle="Configure your application">
-                        <div className="space-y-6">
-                            {/* API Configuration */}
-                            <div className="bg-dark-800/40 rounded-xl shadow-lg p-6 border border-dark-700">
-                                <h2 className="text-xl font-medium mb-4 text-white">API Configuration</h2>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-300 mb-1">API Base
-                                            URL</label>
-                                        <input
-                                            type="text"
-                                            value={API_BASE_URL}
-                                            readOnly
-                                            className="w-full px-3 py-2 border border-dark-600 rounded-lg bg-dark-700/70 text-white"
-                                        />
-                                    </div>
-                                    <p className="text-sm text-gray-400">
-                                        To change the API URL, update the API_BASE_URL constant in the App.jsx file.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Saved Recipients Management */}
-                            <div className="bg-dark-800/40 rounded-xl shadow-lg p-6 border border-dark-700">
-                                <h2 className="text-xl font-medium mb-4 text-white">Saved Recipients</h2>
-                                {savedRecipients.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {savedRecipients.map((recipient, index) => (
-                                            <div key={index}
-                                                 className="flex items-center justify-between py-2 px-3 border-b border-dark-700 bg-dark-700/30 rounded-lg">
-                                                <div className="font-medium text-white flex items-center">
-                                                    <Phone size={16} className="mr-2 text-primary-400"/>
-                                                    {recipient}
-                                                </div>
-                                                <Button
-                                                    variant="danger"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        const newList = [...savedRecipients];
-                                                        newList.splice(index, 1);
-                                                        setSavedRecipients(newList);
-                                                        localStorage.setItem('recipients', JSON.stringify(newList));
-                                                    }}
-                                                >
-                                                    Remove
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-400">No recipients saved yet. Recipients will be
-                                        automatically
-                                        saved when you make calls.</p>
-                                )}
-                            </div>
-
-                            {/* Saved From Numbers Management */}
-                            <div className="bg-dark-800/40 rounded-xl shadow-lg p-6 border border-dark-700">
-                                <h2 className="text-xl font-medium mb-4 text-white">Saved From Numbers</h2>
-                                {savedFromNumbers.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {savedFromNumbers.map((number, index) => (
-                                            <div key={index}
-                                                 className="flex items-center justify-between py-2 px-3 border-b border-dark-700 bg-dark-700/30 rounded-lg">
-                                                <div className="font-medium text-white flex items-center">
-                                                    <Phone size={16} className="mr-2 text-primary-400"/>
-                                                    {number}
-                                                </div>
-                                                <Button
-                                                    variant="danger"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        const newList = [...savedFromNumbers];
-                                                        newList.splice(index, 1);
-                                                        setSavedFromNumbers(newList);
-                                                        localStorage.setItem('fromNumbers', JSON.stringify(newList));
-                                                    }}
-                                                >
-                                                    Remove
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-400">No from numbers saved yet. From numbers will be
-                                        automatically
-                                        saved when you make calls.</p>
-                                )}
-                            </div>
-                        </div>
-                    </PageLayout>
-                );
-
             default:
-                return (
-                    <PageLayout title="404" subtitle="Page not found">
-                        <div className="text-center p-12">
-                            <p className="text-gray-400">The requested page could not be found.</p>
-                            <Button
-                                variant="primary"
-                                className="mt-4"
-                                onClick={() => setCurrentView('dashboard')}
-                            >
-                                Back to Dashboard
-                            </Button>
-                        </div>
-                    </PageLayout>
-                );
+                return <div>404 - View not found</div>;
         }
     };
-
-    // Render notification
-    const renderNotification = () => {
-        if (!notification) return null;
-
-        const getNotificationStyles = (type) => {
-            switch (type) {
-                case 'success':
-                    return {
-                        bg: 'bg-gradient-to-r from-green-900/80 to-green-800/80',
-                        border: 'border-green-700',
-                        text: 'text-green-300',
-                        icon: <CheckCircle size={18} className="text-green-400"/>
-                    };
-                case 'warning':
-                    return {
-                        bg: 'bg-gradient-to-r from-yellow-900/80 to-yellow-800/80',
-                        border: 'border-yellow-700',
-                        text: 'text-yellow-300',
-                        icon: <AlertTriangle size={18} className="text-yellow-400"/>
-                    };
-                case 'error':
-                    return {
-                        bg: 'bg-gradient-to-r from-red-900/80 to-red-800/80',
-                        border: 'border-red-700',
-                        text: 'text-red-300',
-                        icon: <XCircle size={18} className="text-red-400"/>
-                    };
-                default:
-                    return {
-                        bg: 'bg-gradient-to-r from-dark-800/80 to-dark-700/80',
-                        border: 'border-dark-600',
-                        text: 'text-gray-300',
-                        icon: <Bell size={18} className="text-gray-400"/>
-                    };
-            }
-        };
-
-        const styles = getNotificationStyles(notification.type);
-
-        return (
-            <div
-                className={`fixed top-4 right-4 z-50 max-w-md p-3 rounded-lg shadow-xl border ${styles.border} ${styles.bg} backdrop-blur-sm animate-slide-in-left`}>
-                <div className={`flex items-center ${styles.text}`}>
-                    <div className="mr-3">{styles.icon}</div>
-                    <div className="flex-1">{notification.message}</div>
-                    <button
-                        onClick={() => setNotification(null)}
-                        className="ml-4 text-white/80 hover:text-white p-1 rounded-full hover:bg-dark-700/50"
-                    >
-                        <X size={16}/>
-                    </button>
-                </div>
-            </div>
-        );
-    };
-
-    // Update call status more frequently in call-status view
-    useEffect(() => {
-        let interval;
-        if (currentView === 'call-status' && activeCall && activeCall.call_uuid) {
-            interval = setInterval(() => {
-                getCallStatus(activeCall.call_uuid);
-            }, 500); // Update every 500ms (0.5 seconds)
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [currentView, activeCall]);
 
     return (
-        <div className="flex h-screen w-screen bg-gradient-to-b from-dark-900 to-dark-950 overflow-hidden">
+        <div className="flex h-screen bg-dark-900 text-white">
             {/* Sidebar */}
             <Sidebar
                 currentView={currentView}
@@ -991,23 +424,34 @@ function App() {
                 serverStatus={serverStatus}
             />
 
-            {/* Main Content */}
-            <div
-                className="flex-1 overflow-auto bg-gradient-to-b from-dark-900 to-dark-950 text-gray-200 custom-scrollbar">
-                <div className="lg:pl-0 pl-12">  {/* Add left padding on mobile to prevent overlap */}
-                    {renderNotification()}
-                    {renderContent()}
-                </div>
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-auto">
+                {renderMainContent()}
             </div>
 
             {/* Agent Selector Modal */}
             <AgentSelector
-                isOpen={isAgentSelectorOpen}
-                onClose={() => setIsAgentSelectorOpen(false)}
+                isOpen={isAgentModalOpen}
+                onClose={() => setIsAgentModalOpen(false)}
                 agents={agents}
-                onSelectAgent={setSelectedAgentId}
+                onSelectAgent={handleSelectAgent}
                 onCreateNewAgent={handleCreateAgent}
             />
+
+            {/* Agent Form Modal - For creating and editing agents */}
+            {isCreatingAgent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-4xl">
+                        <AgentForm
+                            agent={agentToEdit}
+                            isEditing={!!agentToEdit}
+                            onSave={handleSaveAgent}
+                            onCancel={() => setIsCreatingAgent(false)}
+                            loading={false}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
