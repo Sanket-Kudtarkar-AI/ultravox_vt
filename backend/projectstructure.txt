@@ -1,69 +1,66 @@
-ultravoxcalls/
-│
-├── backend/
-│   ├── plivo_server.py            # Main Flask application (updated with new controller registrations)
-│   ├── api_controller.py          # API endpoints for Plivo (updated with database integration)
-│   ├── analysis_controller.py     # Controller for analysis features (updated with database caching)
-│   ├── agent_controller.py        # NEW: Controller for agent management
-│   ├── phone_controller.py        # NEW: Controller for saved phone numbers
-│   ├── campaign_controller.py     # NEW: Controller for campaign management
-│   ├── utils.py                   # Utility functions
-│   ├── models.py                  # Database models (completely overhauled)
-│   ├── database.py                # Database setup and session management (updated with migration support)
-│   ├── config.py                  # Configuration and constants
-│   ├── requirements.txt           # Python dependencies (updated with new libraries)
-│   ├── calls.db                   # SQLite database file
-│   ├── alembic.ini                # NEW: Alembic migration configuration
-│   ├── migrations/                # NEW: Database migrations directory
-│   │   ├── env.py                 # Migration environment configuration
-│   │   ├── README                 # Migration readme
-│   │   ├── script.py.mako         # Migration script template
-│   │   └── versions/              # Migration version scripts
-│   └── logs/                      # Application logs
-│       ├── api_controller.log     # API logs
-│       ├── plivo_server.log       # Server logs
-│       └── analysis_controller.log# Analysis logs
-│
-├── frontend/
-│   ├── public/
-│   │   ├── index.html             # HTML template
-│   │   └── assets/                # Static assets
-│   ├── src/
-│   │   ├── App.jsx                # Main application (updated to use API instead of localStorage)
-│   │   ├── App.css                # Global styles with animations
-│   │   ├── index.js               # Entry point
-│   │   ├── index.css              # Global styles
-│   │   ├── components/
-│   │   │   ├── Dashboard.jsx      # Dashboard component
-│   │   │   ├── Sidebar.jsx        # Enhanced sidebar with campaign navigation
-│   │   │   ├── AgentSelector.jsx  # Agent selection modal (updated to use API)
-│   │   │   ├── AgentForm.jsx      # Agent form with expanded options (updated to use API)
-│   │   │   ├── NewCallForm.jsx    # Improved call form (updated to use API for phone numbers)
-│   │   │   ├── CallStatus.jsx     # Real-time call status monitoring
-│   │   │   ├── CallDetails.jsx    # Call details view
-│   │   │   ├── RecentCalls.jsx    # Call history with pagination (updated to use API)
-│   │   │   ├── Analysis.jsx       # Enhanced call analysis component
-│   │   │   ├── EntityAnalysis.jsx # OpenAI-powered entity extraction
-│   │   │   ├── WaveformPlayer.jsx # Audio visualization with waveform
-│   │   │   ├── CampaignManager.jsx # Campaign management interface
-│   │   │   └── ui/                # UI component library
-│   │   │       ├── Card.jsx       # Reusable card component
-│   │   │       ├── Button.jsx     # Button component
-│   │   │       ├── Input.jsx      # Form input component
-│   │   │       ├── Select.jsx     # Dropdown select component
-│   │   │       ├── Modal.jsx      # Modal component
-│   │   │       ├── Badge.jsx      # Status badge component
-│   │   │       ├── PageLayout.jsx # Page layout component
-│   │   │       ├── Pagination.jsx # Pagination component
-│   │   │       └── TabButton.jsx  # Tab navigation component
-│   │   ├── utils/
-│   │   │   ├── api.js             # NEW: API client functions for backend integration
-│   │   │   └── formatters.js      # Date and time formatting utilities
-│   │   ├── contexts/
-│   │   │   └── ThemeContext.js    # Theme management (future)
-│   │   └── hooks/
-│   │       └── useApi.js          # Custom hook for API calls
-│   ├── package.json               # Updated with papaparse
-│   ├── tailwind.config.js         # Updated with animations and effects
-│   └── postcss.config.js
-└── CHANGELOG.md                   # Updated with v1.9.1 changes
+Directory structure:
+└── ultravoxcalls/
+    ├── CHANGELOG.md
+    ├── get_started.md
+    ├── plivo_get_calls.md
+    ├── requirements.txt
+    ├── ultravox_get_calls.md
+    ├── backend/
+    │   ├── agent_controller.py
+    │   ├── analysis_controller.py
+    │   ├── api_controller.py
+    │   ├── calls.db
+    │   ├── campaign_controller.py
+    │   ├── config.py
+    │   ├── database.py
+    │   ├── get_started.md
+    │   ├── models.py
+    │   ├── phone_controller.py
+    │   ├── plivo_server.py
+    │   ├── projectstructure.txt
+    │   ├── requirements.txt
+    │   ├── simple_call.py
+    │   ├── test.py
+    │   └── utils.py
+    └── frontend-vite/
+        ├── README.md
+        ├── eslint.config.js
+        ├── index.html
+        ├── package-lock.json
+        ├── package.json
+        ├── postcss.config.js
+        ├── tailwind.config.js
+        ├── vite.config.js
+        ├── public/
+        │   └── index.html
+        └── src/
+            ├── App.css
+            ├── App.jsx
+            ├── index.css
+            ├── index.js
+            ├── main.jsx
+            ├── assets/
+            ├── components/
+            │   ├── AgentForm.jsx
+            │   ├── AgentSelector.jsx
+            │   ├── Analysis.jsx
+            │   ├── CallDetails.jsx
+            │   ├── CallStatus.jsx
+            │   ├── CampaignManager.jsx
+            │   ├── Dashboard.jsx
+            │   ├── EntityAnalysis.jsx
+            │   ├── NewCallForm.jsx
+            │   ├── RecentCalls.jsx
+            │   ├── Sidebar.jsx
+            │   ├── WaveformPlayer.jsx
+            │   └── ui/
+            │       ├── Badge.jsx
+            │       ├── Button.jsx
+            │       ├── Card.jsx
+            │       ├── Input.jsx
+            │       ├── Modal.jsx
+            │       ├── PageLayout.jsx
+            │       ├── Pagination.jsx
+            │       └── Select.jsx
+            └── utils/
+                └── api.js
