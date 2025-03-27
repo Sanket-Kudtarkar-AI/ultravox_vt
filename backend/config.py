@@ -1,6 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
+import urllib
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,28 +44,64 @@ def setup_logging(logger_name, log_file):
     return logger
 
 
-# Plivo Configuration
+# --- Database Configuration ---
+# Load Azure SQL connection details securely from environment variables
+AZURE_DB_PASSWORD = os.getenv('AZURE_DB_PASSWORD')
+AZURE_DB_PASSWORD = "vtdbserver@1238879"
+if not AZURE_DB_PASSWORD:
+    # You might want to raise an error or log a critical warning here
+    print("CRITICAL: AZURE_DB_PASSWORD environment variable is not set!")
+
+# Construct the base connection string (excluding password)
+# Ensure your .env file or environment variables have these set
+AZURE_DB_SERVER = os.getenv('AZURE_DB_SERVER', 'tcp:vt-calls-azure-db-server.database.windows.net,1433')
+AZURE_DB_DATABASE = os.getenv('AZURE_DB_DATABASE', 'vt_calls_azure_db')
+AZURE_DB_USERNAME = os.getenv('AZURE_DB_USERNAME', 'vt_db_admin')
+AZURE_DB_DRIVER = os.getenv('AZURE_DB_DRIVER', '{ODBC Driver 18 for SQL Server}')  # Use the driver you installed
+
+# Create the connection string with the password URL-encoded
+# NOTE: The password is read from the environment variable AZURE_DB_PASSWORD
+# The rest of the connection string can also be moved to environment variables for more flexibility
+AZURE_CONN_STR = (
+    f"Driver={AZURE_DB_DRIVER};"
+    f"Server={AZURE_DB_SERVER};"
+    f"Database={AZURE_DB_DATABASE};"
+    f"Uid={AZURE_DB_USERNAME};"
+    f"Pwd={AZURE_DB_PASSWORD};"  # Password loaded from env var
+    "Encrypt=yes;"
+    "TrustServerCertificate=no;"
+    "Connection Timeout=30;"
+)
+
+# Create the SQLAlchemy DATABASE_URL using the pyodbc dialect
+# URL encode the connection string to handle special characters safely
+# Ensure the password is kept secure via environment variables
+# Example assumes you have AZURE_DB_PASSWORD set in your environment
+DATABASE_URL = f"mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(AZURE_CONN_STR)}"
+
+# --- Plivo Configuration ---
 PLIVO_AUTH_ID = os.getenv('PLIVO_AUTH_ID')
 PLIVO_AUTH_TOKEN = os.getenv('PLIVO_AUTH_TOKEN')
 PLIVO_PHONE_NUMBER = os.getenv('PLIVO_PHONE_NUMBER')
 
-# Ultravox Configuration
+# --- Ultravox Configuration ---
 ULTRAVOX_API_KEY = os.getenv('ULTRAVOX_API_KEY', 'pNdPGbt6.pewiRrPNU7vTY4zs9JsCDO8X9s4YYtvo')
 ULTRAVOX_API_BASE_URL = "https://api.ultravox.ai/api"
 
-# Server Configuration
+# --- Server Configuration ---
 NGROK_URL = os.getenv('NGROK_URL')
 DEFAULT_RECIPIENT_NUMBER = os.getenv('DEFAULT_RECIPIENT_NUMBER', '+918879415567')
 
-# Default VAD Settings
+# --- Default VAD Settings ---
 DEFAULT_VAD_SETTINGS = {
     "turnEndpointDelay": "0.384s",
     "minimumTurnDuration": "0s",
-    "minimumInterruptionDuration": "0.05s",  # Reduced to 50ms to make interruption easier
-    "frameActivationThreshold": 0.1  # The most sensitive setting
+    "minimumInterruptionDuration": "0.05s",
+    "frameActivationThreshold": 0.1
 }
 
-# System Prompt
+# --- System Prompt ---
+
 SYSTEM_PROMPT = """# AI Voice Call Script for Real Estate Sales
 
 ## Character: Muashmi (मौश्मी)

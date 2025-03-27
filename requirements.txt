@@ -2,3 +2,4 @@ flask
 plivo
 requests
 python-dotenv
+pyodbc
