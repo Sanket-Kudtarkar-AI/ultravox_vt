@@ -695,9 +695,19 @@ def get_campaign_stats(campaign_id):
             success_rate = round(
                 (completed_contacts / (completed_contacts + failed_contacts + no_answer_contacts)) * 100, 2)
 
-        # Calculate analysis progress
-        analysis_progress = 0
-        if campaign.status == 'completed' and completed_contacts > 0:
+        # Use stored progress value if available, otherwise calculate
+        progress = campaign.progress
+        if progress is None:
+            progress = completion_rate
+            # Update campaign progress if it wasn't set
+            campaign.progress = progress
+            db_session.commit()
+
+        # Get analysis progress directly from campaign
+        analysis_progress = campaign.analysis_progress
+
+        # If analysis_progress isn't set but campaign is completed, calculate it
+        if analysis_progress is None and campaign.status == 'completed' and completed_contacts > 0:
             # Get all completed calls for this campaign
             completed_call_uuids = db_session.query(CampaignContact.call_uuid).filter_by(
                 campaign_id=campaign_id,
@@ -718,6 +728,10 @@ def get_campaign_stats(campaign_id):
                 # Calculate percentage
                 analysis_progress = round((calls_with_analysis / len(completed_call_uuids)) * 100) if len(
                     completed_call_uuids) > 0 else 0
+
+                # Update campaign analysis_progress
+                campaign.analysis_progress = analysis_progress
+                db_session.commit()
 
         # Get associated calls
         calls = db_session.query(CallLog).filter_by(campaign_id=campaign_id).all()
@@ -749,7 +763,8 @@ def get_campaign_stats(campaign_id):
             "success_rate": success_rate,
             "total_calls": call_count,
             "average_call_duration": avg_duration,
-            "analysis_progress": analysis_progress,
+            "progress": progress,  # Add progress
+            "analysis_progress": analysis_progress,  # Add analysis_progress
             "created_at": campaign.created_at.isoformat() if campaign.created_at else None,
             "updated_at": campaign.updated_at.isoformat() if campaign.updated_at else None,
             "schedule_date": campaign.schedule_date.isoformat() if campaign.schedule_date else None

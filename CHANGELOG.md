@@ -7,6 +7,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+# CHANGELOG - Version 1.13.1 (March 29, 2025)
+
+## Database Enhancements
+- Added `progress` and `analysis_progress` columns to campaigns table for better tracking
+- Implemented CallAnalysisStatus model to store analysis status for each call
+- Added unique constraint on call_uuid in analysis status table
+
+## Campaign Execution Improvements
+- Fixed critical issue where campaigns showed running status but no calls were processed
+- Enhanced campaign executor to properly track pending contacts
+- Improved error handling and logging throughout execution flow
+- Added detailed debug endpoint for campaign executor diagnostics
+- Fixed issues with make_call function to ensure proper API communication
+
+## Analysis Status Tracking
+- Implemented database-backed analysis status tracking 
+- Added batch API endpoint for efficient analysis status retrieval
+- Created per-call analysis status tracking for transcript, recording, and summary
+- Fixed race conditions in analysis status checks after call completion
+
+## JSON Handling Fixes
+- Fixed JSON parsing errors in CampaignResults.jsx
+- Added type-checking to correctly handle both string and object data formats
+- Improved error handling for malformed JSON data
+- Fixed issue where objects were being stored as "[object Object]" in database
+
+## API Improvements
+- Added call_analysis_status API endpoint to retrieve analysis status for each call
+- Added batch API endpoint to efficiently get analysis status for multiple calls
+- Implemented better error handling for API responses
+- Added retry mechanism for failed API calls
+
+## Technical Improvements
+- Enhanced debug logging throughout the codebase
+- Improved database session handling with proper retry logic
+- Fixed concurrent execution issues with threading improvements
+- Added better error isolation to prevent cascading failures
+
 # CHANGELOG - Version 1.12.1 (March 28, 2025)
 
 ## Campaign Execution Service

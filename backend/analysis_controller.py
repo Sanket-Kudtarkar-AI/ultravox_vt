@@ -9,8 +9,9 @@ import os
 import re
 import json
 from datetime import datetime
-from models import CallLog, CallAnalytics
+from models import CallLog, CallAnalytics, CallAnalysisStatus
 from database import get_db_session, close_db_session, get_db_session_with_retry
+from sqlalchemy import func
 
 # Set up logging
 logger = setup_logging("analysis_controller", "analysis_controller.log")
@@ -727,3 +728,176 @@ def analyze_transcript(call_id):
             close_db_session(db_session)
         except:
             pass
+
+
+@analysis.route('/call_analysis_status/<call_uuid>', methods=['GET'])
+def get_call_analysis_status(call_uuid):
+    """
+    Get the analysis status for a call from the database
+    """
+    try:
+        logger.info(f"Fetching analysis status for call UUID: {call_uuid}")
+
+        db_session = get_db_session_with_retry()
+
+        # Check if we have an analysis status record
+        analysis_status = db_session.query(CallAnalysisStatus).filter_by(call_uuid=call_uuid).first()
+
+        if analysis_status:
+            # Return the stored status
+            return jsonify({
+                "status": "success",
+                "analysis_status": analysis_status.to_dict()
+            })
+
+        # If no status record, check if call exists and create a record on the fly
+        call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+
+        if not call_log:
+            return jsonify({
+                "status": "error",
+                "message": f"No call found with UUID: {call_uuid}"
+            }), 404
+
+        # Create a new status record
+        new_status = CallAnalysisStatus(
+            call_uuid=call_uuid,
+            ultravox_id=call_log.ultravox_id,
+            has_transcript=call_log.transcription is not None,
+            has_recording=call_log.recording_url is not None,
+            has_summary=call_log.summary is not None,
+            is_complete=(call_log.transcription is not None and
+                         call_log.recording_url is not None and
+                         call_log.summary is not None)
+        )
+
+        db_session.add(new_status)
+        db_session.commit()
+
+        logger.info(f"Created new analysis status record for call {call_uuid}")
+
+        return jsonify({
+            "status": "success",
+            "analysis_status": new_status.to_dict(),
+            "source": "auto-generated"
+        })
+
+    except Exception as e:
+        logger.error(f"Error in get_call_analysis_status: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        close_db_session(db_session)
+
+
+@analysis.route('/call_analysis_status_batch', methods=['POST'])
+def get_call_analysis_status_batch():
+    """
+    Get analysis status for multiple calls in a batch
+    """
+    try:
+        data = request.json
+
+        if not data or not isinstance(data, dict) or 'call_uuids' not in data:
+            return jsonify({
+                "status": "error",
+                "message": "Request must include 'call_uuids' list"
+            }), 400
+
+        call_uuids = data['call_uuids']
+
+        if not isinstance(call_uuids, list) or not call_uuids:
+            return jsonify({
+                "status": "error",
+                "message": "'call_uuids' must be a non-empty list"
+            }), 400
+
+        logger.info(f"Fetching batch analysis status for {len(call_uuids)} calls")
+
+        db_session = get_db_session_with_retry()
+
+        # Get all existing status records
+        existing_statuses = db_session.query(CallAnalysisStatus).filter(
+            CallAnalysisStatus.call_uuid.in_(call_uuids)
+        ).all()
+
+        # Convert to dictionary keyed by call_uuid
+        results = {status.call_uuid: status.to_dict() for status in existing_statuses}
+
+        # Find call_uuids without status records
+        existing_uuids = set(status.call_uuid for status in existing_statuses)
+        missing_uuids = [uuid for uuid in call_uuids if uuid not in existing_uuids]
+
+        if missing_uuids:
+            logger.info(f"Creating analysis status records for {len(missing_uuids)} calls")
+
+            # Get call logs for missing uuids
+            call_logs = db_session.query(CallLog).filter(
+                CallLog.call_uuid.in_(missing_uuids)
+            ).all()
+
+            # Map call logs by UUID for quick lookup
+            call_logs_by_uuid = {log.call_uuid: log for log in call_logs}
+
+            # Create status records for calls that exist
+            for uuid in missing_uuids:
+                if uuid in call_logs_by_uuid:
+                    call_log = call_logs_by_uuid[uuid]
+
+                    # Create new status record
+                    new_status = CallAnalysisStatus(
+                        call_uuid=call_log.call_uuid,
+                        ultravox_id=call_log.ultravox_id,
+                        has_transcript=call_log.transcription is not None,
+                        has_recording=call_log.recording_url is not None,
+                        has_summary=call_log.summary is not None,
+                        is_complete=(call_log.transcription is not None and
+                                     call_log.recording_url is not None and
+                                     call_log.summary is not None),
+                        last_checked=func.now()
+                    )
+
+                    db_session.add(new_status)
+
+                    # Add to results (we'll commit after this loop)
+                    # Use to_dict() after commit to ensure ID is populated
+                    results[uuid] = {
+                        "call_uuid": call_log.call_uuid,
+                        "ultravox_id": call_log.ultravox_id,
+                        "has_transcript": call_log.transcription is not None,
+                        "has_recording": call_log.recording_url is not None,
+                        "has_summary": call_log.summary is not None,
+                        "is_complete": (call_log.transcription is not None and
+                                        call_log.recording_url is not None and
+                                        call_log.summary is not None),
+                        "created_at": datetime.now().isoformat()
+                    }
+
+            # Commit all new records
+            try:
+                db_session.commit()
+                logger.info(f"Successfully created {len(missing_uuids)} analysis status records")
+            except Exception as commit_error:
+                logger.error(f"Error committing new analysis status records: {str(commit_error)}")
+                # If there's a commit error, roll back and continue with what we have
+                db_session.rollback()
+
+        return jsonify({
+            "status": "success",
+            "results": results,
+            "total": len(results),
+            "missing": len(call_uuids) - len(results)
+        })
+
+    except Exception as e:
+        logger.error(f"Error in get_call_analysis_status_batch: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        close_db_session(db_session)

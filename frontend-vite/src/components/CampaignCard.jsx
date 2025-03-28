@@ -44,21 +44,32 @@ const CampaignCard = ({
 
   // Calculate progress
   const calculateProgress = () => {
-    if (!campaign.total_contacts || campaign.total_contacts === 0) return 0;
-
-    // If campaign has statistics, use them
-    if (campaign.statistics) {
-      const { completed_contacts, failed_contacts, total_contacts } = campaign.statistics;
-      const processed = completed_contacts + failed_contacts;
-      return Math.round((processed / total_contacts) * 100);
+    if (campaign.progress !== undefined && campaign.progress !== null) {
+      return campaign.progress;
     }
 
-    // Fallback to just using total_contacts
-    return 0; // Can't calculate without more data
+    if (campaign.statistics && campaign.statistics.progress !== undefined) {
+      return campaign.statistics.progress;
+    }
+
+    if (campaign.statistics) {
+      const { total_contacts, completed_contacts, failed_contacts, no_answer_contacts } = campaign.statistics;
+      if (total_contacts && total_contacts > 0) {
+        const processed = (completed_contacts || 0) + (failed_contacts || 0) + (no_answer_contacts || 0);
+        return Math.round((processed / total_contacts) * 100);
+      }
+    }
+
+    return 0;
   };
 
   // Get analysis progress if available
-  const analysisProgress = campaign.statistics?.analysis_progress || 0;
+  const analysisProgress = campaign.analysis_progress !== undefined ?
+    campaign.analysis_progress :
+    (campaign.statistics && campaign.statistics.analysis_progress !== undefined ?
+      campaign.statistics.analysis_progress :
+      0);
+
   const progressPercent = calculateProgress();
   const statusBadge = getStatusBadge(campaign.status);
 
@@ -69,15 +80,15 @@ const CampaignCard = ({
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Card Header */}
-      <div className="p-4 border-b border-dark-600 bg-dark-800/40 flex justify-between items-center">
+      <div className="p-3 border-b border-dark-600 bg-dark-800/40 flex justify-between items-center">
         <div className="flex items-center">
-          <div className="bg-dark-600 p-2 rounded-lg mr-3">
-            <Phone size={20} className="text-primary-400" />
+          <div className="bg-dark-600 p-1.5 rounded-lg mr-2">
+            <Phone size={16} className="text-primary-400" />
           </div>
           <div>
-            <h3 className="text-white font-medium text-lg">{campaign.campaign_name}</h3>
-            <p className="text-gray-400 text-sm flex items-center">
-              <Clock size={14} className="mr-1" />
+            <h3 className="text-white font-medium">{campaign.campaign_name}</h3>
+            <p className="text-gray-400 text-xs flex items-center">
+              <Clock size={12} className="mr-1" />
               Created: {formatDate(campaign.created_at)}
             </p>
           </div>
@@ -96,37 +107,37 @@ const CampaignCard = ({
       </div>
 
       {/* Card Body */}
-      <div className="p-4">
+      <div className="p-3">
         {/* Agent Information */}
-        <div className="flex items-start mb-4">
-          <User size={16} className="text-gray-400 mr-2 mt-0.5" />
+        <div className="flex items-start mb-2">
+          <User size={14} className="text-gray-400 mr-1.5 mt-0.5" />
           <div>
-            <p className="text-sm text-gray-400">Agent</p>
-            <p className="text-white font-medium">{campaign.assigned_agent_name || 'Unknown Agent'}</p>
+            <p className="text-xs text-gray-400">Agent</p>
+            <p className="text-white font-medium text-sm">{campaign.assigned_agent_name || 'Unknown Agent'}</p>
           </div>
         </div>
 
-        {/* Campaign Schedule */}
+        {/* Campaign Schedule - Only show if scheduled */}
         {campaign.schedule_date && (
-          <div className="flex items-start mb-4">
-            <Calendar size={16} className="text-gray-400 mr-2 mt-0.5" />
+          <div className="flex items-start mb-2">
+            <Calendar size={14} className="text-gray-400 mr-1.5 mt-0.5" />
             <div>
-              <p className="text-sm text-gray-400">Scheduled For</p>
-              <p className="text-white font-medium">{formatDate(campaign.schedule_date)}</p>
+              <p className="text-xs text-gray-400">Scheduled For</p>
+              <p className="text-white font-medium text-sm">{formatDate(campaign.schedule_date)}</p>
             </div>
           </div>
         )}
 
         {/* Contact Statistics */}
-        <div className="mb-4">
-          <div className="flex justify-between text-sm mb-1">
+        <div className="mb-2">
+          <div className="flex justify-between text-xs mb-0.5">
             <span className="text-gray-400">Progress</span>
             <span className="text-white">{progressPercent}%</span>
           </div>
 
-          <div className="w-full bg-dark-600 rounded-full h-2.5 mb-1">
+          <div className="w-full bg-dark-600 rounded-full h-2 mb-0.5">
             <div
-              className="bg-gradient-to-r from-primary-600 to-primary-400 h-2.5 rounded-full"
+              className="bg-gradient-to-r from-primary-600 to-primary-400 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
             ></div>
           </div>
@@ -141,20 +152,20 @@ const CampaignCard = ({
           </div>
         </div>
 
-        {/* Analysis Progress - Only show for completed campaigns */}
-        {campaign.status === 'completed' && (
-          <div className="mb-4 mt-3">
-            <div className="flex justify-between text-sm mb-1 items-center">
+        {/* Analysis Progress - Only show for completed campaigns or if analysis progress > 0 */}
+        {(campaign.status === 'completed' || analysisProgress > 0) && (
+          <div className="mb-2">
+            <div className="flex justify-between text-xs mb-0.5 items-center">
               <span className="text-gray-400 flex items-center">
-                <Activity size={12} className="mr-1 text-accent-400" />
+                <Activity size={10} className="mr-1 text-accent-400" />
                 Analysis Ready
               </span>
               <span className="text-white">{analysisProgress}%</span>
             </div>
 
-            <div className="w-full bg-dark-600 rounded-full h-2.5 mb-1">
+            <div className="w-full bg-dark-600 rounded-full h-2 mb-0.5">
               <div
-                className="bg-gradient-to-r from-accent-600 to-accent-400 h-2.5 rounded-full"
+                className="bg-gradient-to-r from-accent-600 to-accent-400 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${analysisProgress}%` }}
               ></div>
             </div>
@@ -163,17 +174,17 @@ const CampaignCard = ({
 
         {/* Success Rate if available */}
         {campaign.statistics && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="bg-dark-800/50 p-2 rounded-lg">
-              <p className="text-xs text-gray-400">Completion Rate</p>
-              <p className="text-white font-medium">
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="bg-dark-800/50 p-1.5 rounded-lg">
+              <p className="text-xs text-gray-400">Completion</p>
+              <p className="text-white font-medium text-sm">
                 {campaign.statistics.completion_percentage || 0}%
               </p>
             </div>
 
-            <div className="bg-dark-800/50 p-2 rounded-lg">
+            <div className="bg-dark-800/50 p-1.5 rounded-lg">
               <p className="text-xs text-gray-400">Success Rate</p>
-              <p className="text-white font-medium">
+              <p className="text-white font-medium text-sm">
                 {campaign.statistics.success_rate || 0}%
               </p>
             </div>
@@ -187,8 +198,8 @@ const CampaignCard = ({
             <Button
               onClick={onViewResults}
               variant="primary"
-              size="sm"
-              icon={<BarChart size={14} />}
+              size="xs"
+              icon={<BarChart size={12} />}
               title="View Campaign Details"
             >
               Details
@@ -201,8 +212,8 @@ const CampaignCard = ({
               <Button
                 onClick={onEdit}
                 variant="outline"
-                size="sm"
-                icon={<Edit size={14} />}
+                size="xs"
+                icon={<Edit size={12} />}
                 title="Edit Campaign"
               />
             )}
@@ -211,8 +222,8 @@ const CampaignCard = ({
             <Button
               onClick={onDuplicate}
               variant="outline"
-              size="sm"
-              icon={<Copy size={14} />}
+              size="xs"
+              icon={<Copy size={12} />}
               title="Duplicate Campaign"
             />
 
@@ -220,8 +231,8 @@ const CampaignCard = ({
             <Button
               onClick={onDelete}
               variant="danger"
-              size="sm"
-              icon={<Trash2 size={14} />}
+              size="xs"
+              icon={<Trash2 size={12} />}
               title="Delete Campaign"
             />
           </div>
@@ -232,22 +243,22 @@ const CampaignCard = ({
           <Button
             onClick={() => onUpdateStatus('running')}
             variant="success"
-            size="sm"
-            icon={<Play size={14} />}
+            size="xs"
+            icon={<Play size={12} />}
             fullWidth
-            className="mt-3"
+            className="mt-2"
           >
             {campaign.status === 'paused' ? 'Resume Campaign' : 'Start Campaign'}
           </Button>
         )}
 
         {campaign.status === 'running' && (
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-2 gap-2 mt-2">
             <Button
               onClick={() => onUpdateStatus('paused')}
               variant="warning"
-              size="sm"
-              icon={<Pause size={14} />}
+              size="xs"
+              icon={<Pause size={12} />}
               fullWidth
             >
               Pause
@@ -256,8 +267,8 @@ const CampaignCard = ({
             <Button
               onClick={() => onUpdateStatus('completed')}
               variant="danger"
-              size="sm"
-              icon={<Square size={14} />}
+              size="xs"
+              icon={<Square size={12} />}
               fullWidth
             >
               Stop

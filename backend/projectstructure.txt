@@ -6,17 +6,17 @@ ultravoxcalls/
 ├── ultravox_get_calls.md
 ├── backend/
 │   ├── agent_controller.py
-│   ├── analysis_controller.py
-│   ├── api_controller.py             # Updated with call status API enhancements
+│   ├── analysis_controller.py          # Updated with call analysis status endpoints
+│   ├── api_controller.py               # Updated with call status API enhancements
 │   ├── calls.db
-│   ├── campaign_controller.py        # Updated with campaign execution endpoints
-│   ├── campaign_executor.py          # NEW file for campaign execution service
+│   ├── campaign_controller.py          # Added executor debug endpoint
+│   ├── campaign_executor.py            # Fixed execution logic and error handling
 │   ├── config.py
 │   ├── database.py
 │   ├── get_started.md
-│   ├── models.py
+│   ├── models.py                       # Added CallAnalysisStatus model & campaign progress fields
 │   ├── phone_controller.py
-│   ├── plivo_server.py               # Updated with campaign executor integration
+│   ├── plivo_server.py                 # Updated with campaign executor integration
 │   ├── requirements.txt
 │   ├── simple_call.py
 │   ├── test.py
@@ -34,7 +34,7 @@ ultravoxcalls/
     │   └── index.html
     └── src/
         ├── App.css
-        ├── App.jsx                        # Updated to connect to campaign executor
+        ├── App.jsx                     # Updated to connect to campaign executor
         ├── index.css
         ├── index.js
         ├── main.jsx
@@ -45,10 +45,10 @@ ultravoxcalls/
         │   ├── Analysis.jsx
         │   ├── CallDetails.jsx
         │   ├── CallStatus.jsx
-        │   ├── CampaignCard.jsx           # Updated with status display improvements
+        │   ├── CampaignCard.jsx        # Updated with progress display and optimization
         │   ├── CampaignCreationWizard.jsx
-        │   ├── CampaignManager.jsx         # Updated to remove monitor view
-        │   ├── CampaignResults.jsx         # Updated with optimized dynamic refreshing
+        │   ├── CampaignManager.jsx     # Updated to remove monitor view
+        │   ├── CampaignResults.jsx     # Fixed JSON parsing and added better status display
         │   ├── Dashboard.jsx
         │   ├── EntityAnalysis.jsx
         │   ├── NewCallForm.jsx
