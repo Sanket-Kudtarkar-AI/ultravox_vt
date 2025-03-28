@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func
 from models import Campaign, Agent, CampaignContact, CallLog
-from database import get_db_session, close_db_session
+from database import get_db_session, close_db_session, get_db_session_with_retry
 from config import setup_logging
 from datetime import datetime
 
@@ -20,7 +20,7 @@ def get_campaigns():
     Get all campaigns
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         campaigns = db_session.query(Campaign).all()
 
         return jsonify({
@@ -43,7 +43,7 @@ def get_campaign(campaign_id):
     Get a specific campaign by ID
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
 
         if not campaign:
@@ -108,7 +108,7 @@ def create_campaign():
                     "message": f"Missing required field: {field}"
                 }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Verify agent exists
         agent = db_session.query(Agent).filter_by(agent_id=data["assigned_agent_id"]).first()
@@ -163,7 +163,7 @@ def update_campaign(campaign_id):
         data = request.json
         logger.info(f"Received update campaign request for {campaign_id}: {data}")
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -235,7 +235,7 @@ def delete_campaign(campaign_id):
     Delete a campaign
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -288,7 +288,7 @@ def update_campaign_status(campaign_id):
                 "message": "Missing required field: status"
             }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -335,7 +335,7 @@ def get_campaign_contacts(campaign_id):
     Get all contacts for a campaign
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -379,7 +379,7 @@ def add_campaign_contacts(campaign_id):
                 "message": "Expected a JSON array of contacts"
             }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -448,7 +448,7 @@ def update_campaign_contact(campaign_id, contact_id):
     try:
         data = request.json
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if contact exists and belongs to the campaign
         contact = db_session.query(CampaignContact).filter_by(
@@ -510,7 +510,7 @@ def delete_campaign_contact(campaign_id, contact_id):
     Delete a campaign contact
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if contact exists and belongs to the campaign
         contact = db_session.query(CampaignContact).filter_by(
@@ -566,7 +566,7 @@ def schedule_campaign(campaign_id):
                 "message": "Missing required field: schedule_date"
             }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -615,7 +615,7 @@ def get_next_campaign_contact(campaign_id):
     Get the next pending contact for a campaign
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
@@ -670,7 +670,7 @@ def get_campaign_stats(campaign_id):
     Get statistics for a campaign
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if campaign exists
         campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()

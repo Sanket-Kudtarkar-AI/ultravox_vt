@@ -15,7 +15,7 @@ from analysis_controller import analysis
 from agent_controller import agent
 from phone_controller import phone
 from campaign_controller import campaign
-from database import init_db, get_db_session, close_db_session
+from database import init_db, get_db_session, close_db_session, get_db_session_with_retry
 from models import CallLog, CallMapping, Agent
 
 
@@ -80,11 +80,11 @@ def answer_url():
 
     # Format initial messages correctly for Ultravox API
     formatted_initial_messages = []
-    for msg in initial_messages:
-        if isinstance(msg, str):
-            formatted_initial_messages.append({"text": msg})
-        elif isinstance(msg, dict) and "text" in msg:
-            formatted_initial_messages.append({"text": msg["text"]})
+    # for msg in initial_messages:
+    #     if isinstance(msg, str):
+    #         formatted_initial_messages.append({"text": msg})
+    #     elif isinstance(msg, dict) and "text" in msg:
+    #         formatted_initial_messages.append({"text": msg["text"]})
 
     inactivity_messages = current_app.config.get("CUSTOM_INACTIVITY_MESSAGES",
                                                  [{"duration": "8s", "message": "are you there?"}])
@@ -132,7 +132,7 @@ def answer_url():
 
         # Update the database with call information
         try:
-            db_session = get_db_session()
+            db_session = get_db_session_with_retry()
 
             # First check if a CallLog record already exists for this call_uuid
             call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
@@ -243,7 +243,7 @@ def hangup_url():
 
     # Update the database with call information
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Update CallLog record
         call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()

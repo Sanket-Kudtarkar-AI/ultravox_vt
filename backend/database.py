@@ -3,6 +3,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from models import Base
 import os
 from config import setup_logging, DATABASE_URL # Import DATABASE_URL from config
+import time
+
 
 # Set up logging
 logger = setup_logging("database", "database.log")
@@ -56,6 +58,24 @@ def close_db_session(session):
             session.close() #
         except Exception as e:
             logger.error(f"Error closing database session: {str(e)}") #
+
+
+def get_db_session_with_retry(max_retries=3, backoff=1):
+    retries = 0
+    last_error = None
+
+    while retries < max_retries:
+        try:
+            return get_db_session()
+        except Exception as e:
+            retries += 1
+            last_error = e
+            logger.warning(f"Database connection error, retry {retries}/{max_retries}: {str(e)}")
+            time.sleep(backoff * retries)
+
+    # If we get here, all retries failed
+    logger.error(f"Failed to connect to database after {max_retries} attempts")
+    raise last_error
 
 # Note: Removed the direct call to init_db() here.
 # It's better to call init_db() explicitly from your main application

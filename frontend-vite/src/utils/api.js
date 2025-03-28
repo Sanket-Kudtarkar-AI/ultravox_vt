@@ -5,32 +5,32 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:500
 
 // Error handler function to standardize error handling
 const handleApiError = (error, customMessage = null) => {
-  console.error('API Error:', error);
+    console.error('API Error:', error);
 
-  // If we have a response with error data, use that
-  if (error.response && error.response.data) {
+    // If we have a response with error data, use that
+    if (error.response && error.response.data) {
+        return {
+            status: 'error',
+            message: error.response.data.message || customMessage || 'An error occurred while processing your request',
+            statusCode: error.response.status
+        };
+    }
+
+    // Handle network errors
+    if (error.request) {
+        return {
+            status: 'error',
+            message: 'Network error - please check your connection',
+            statusCode: 0
+        };
+    }
+
+    // Handle other errors
     return {
-      status: 'error',
-      message: error.response.data.message || customMessage || 'An error occurred while processing your request',
-      statusCode: error.response.status
+        status: 'error',
+        message: customMessage || error.message || 'An unexpected error occurred',
+        statusCode: 0
     };
-  }
-
-  // Handle network errors
-  if (error.request) {
-    return {
-      status: 'error',
-      message: 'Network error - please check your connection',
-      statusCode: 0
-    };
-  }
-
-  // Handle other errors
-  return {
-    status: 'error',
-    message: customMessage || error.message || 'An unexpected error occurred',
-    statusCode: 0
-  };
 };
 
 /**
@@ -39,25 +39,25 @@ const handleApiError = (error, customMessage = null) => {
  * @returns {Promise<Object>} Call response
  */
 export const makeCall = async (callData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/make_call`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(callData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/make_call`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(callData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to initiate call');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to initiate call');
-  }
 };
 
 /**
@@ -66,18 +66,51 @@ export const makeCall = async (callData) => {
  * @returns {Promise<Object>} Call status
  */
 export const getCallStatus = async (callUuid) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/call_status/${callUuid}`);
-    const data = await response.json();
+    try {
+        // First try to get live call status with explicit status=live parameter
+        try {
+            const liveCallResponse = await fetch(`${API_BASE_URL}/call_status/${callUuid}?status=live`);
+            const liveCallData = await liveCallResponse.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+            // Check if response contains error field
+            if (liveCallData.error || liveCallData.status === 'error') {
+                throw new Error('Call not found in live calls');
+            }
+
+            // If we get here, it's a live call
+            return {
+                status: 'success',
+                phase: 'live',
+                call_status: liveCallData.call_status || 'unknown',
+                details: liveCallData.details || {}
+            };
+        } catch (liveCallError) {
+            console.log("Live call check failed, trying completed call lookup:", liveCallError.message);
+
+            // If live call check fails, try to get completed call data
+            const completedCallResponse = await fetch(`${API_BASE_URL}/call_status/${callUuid}`);
+            const completedCallData = await completedCallResponse.json();
+
+            if (!completedCallResponse.ok || completedCallData.status === 'error') {
+                throw new Error(completedCallData.message || 'Call not found');
+            }
+
+            // Return completed call data
+            return {
+                status: 'success',
+                phase: 'completed',
+                call_status: completedCallData.call.call_state || 'completed',
+                details: completedCallData.call || {}
+            };
+        }
+    } catch (error) {
+        console.error('Error in getCallStatus:', error);
+        return {
+            status: 'error',
+            message: error.message || 'Failed to get call status',
+            phase: 'unknown'
+        };
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call status');
-  }
 };
 
 /**
@@ -87,18 +120,18 @@ export const getCallStatus = async (callUuid) => {
  * @returns {Promise<Object>} Recent calls
  */
 export const getRecentCalls = async (limit = 20, offset = 0) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/recent_calls?limit=${limit}&offset=${offset}`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/recent_calls?limit=${limit}&offset=${offset}`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get recent calls');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get recent calls');
-  }
 };
 
 /**
@@ -107,18 +140,18 @@ export const getRecentCalls = async (limit = 20, offset = 0) => {
  * @returns {Promise<Object>} Call details
  */
 export const getCallDetails = async (callUuid) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/call_details/${callUuid}`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/call_details/${callUuid}`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get call details');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call details');
-  }
 };
 
 /**
@@ -127,18 +160,18 @@ export const getCallDetails = async (callUuid) => {
  * @returns {Promise<Object>} Call mapping
  */
 export const getCallMapping = async (callUuid) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/call_mapping/${callUuid}`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/call_mapping/${callUuid}`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get call mapping');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call mapping');
-  }
 };
 
 /**
@@ -148,22 +181,22 @@ export const getCallMapping = async (callUuid) => {
  * @returns {Promise<Object>} Call transcription
  */
 export const getCallTranscription = async (callId, refresh = false) => {
-  try {
-    const url = refresh
-      ? `${API_BASE_URL}/call_transcription/${callId}?refresh=true`
-      : `${API_BASE_URL}/call_transcription/${callId}`;
+    try {
+        const url = refresh
+            ? `${API_BASE_URL}/call_transcription/${callId}?refresh=true`
+            : `${API_BASE_URL}/call_transcription/${callId}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get call transcription');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call transcription');
-  }
 };
 
 /**
@@ -173,22 +206,22 @@ export const getCallTranscription = async (callId, refresh = false) => {
  * @returns {Promise<Object>} Call recording URL
  */
 export const getCallRecording = async (callId, refresh = false) => {
-  try {
-    const url = refresh
-      ? `${API_BASE_URL}/call_recording/${callId}?refresh=true`
-      : `${API_BASE_URL}/call_recording/${callId}`;
+    try {
+        const url = refresh
+            ? `${API_BASE_URL}/call_recording/${callId}?refresh=true`
+            : `${API_BASE_URL}/call_recording/${callId}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get call recording');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call recording');
-  }
 };
 
 /**
@@ -199,22 +232,22 @@ export const getCallRecording = async (callId, refresh = false) => {
  * @returns {Promise<Object>} Call analytics
  */
 export const getCallAnalytics = async (callId, callUuid, refresh = false) => {
-  try {
-    const url = refresh
-      ? `${API_BASE_URL}/call_analytics/${callId}/${callUuid}?refresh=true`
-      : `${API_BASE_URL}/call_analytics/${callId}/${callUuid}`;
+    try {
+        const url = refresh
+            ? `${API_BASE_URL}/call_analytics/${callId}/${callUuid}?refresh=true`
+            : `${API_BASE_URL}/call_analytics/${callId}/${callUuid}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get call analytics');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get call analytics');
-  }
 };
 
 /**
@@ -224,22 +257,22 @@ export const getCallAnalytics = async (callId, callUuid, refresh = false) => {
  * @returns {Promise<Object>} Analysis results
  */
 export const analyzeTranscript = async (callId, refresh = false) => {
-  try {
-    const url = refresh
-      ? `${API_BASE_URL}/analyze_transcript/${callId}?refresh=true`
-      : `${API_BASE_URL}/analyze_transcript/${callId}`;
+    try {
+        const url = refresh
+            ? `${API_BASE_URL}/analyze_transcript/${callId}?refresh=true`
+            : `${API_BASE_URL}/analyze_transcript/${callId}`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to analyze transcript');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to analyze transcript');
-  }
 };
 
 // ==============================
@@ -251,18 +284,18 @@ export const analyzeTranscript = async (callId, refresh = false) => {
  * @returns {Promise<Object>} All agents
  */
 export const getAgents = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get agents');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get agents');
-  }
 };
 
 /**
@@ -271,18 +304,18 @@ export const getAgents = async () => {
  * @returns {Promise<Object>} Agent details
  */
 export const getAgent = async (agentId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents/${agentId}`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents/${agentId}`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get agent');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get agent');
-  }
 };
 
 /**
@@ -291,25 +324,25 @@ export const getAgent = async (agentId) => {
  * @returns {Promise<Object>} Created agent
  */
 export const createAgent = async (agentData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(agentData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(agentData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to create agent');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to create agent');
-  }
 };
 
 /**
@@ -319,25 +352,25 @@ export const createAgent = async (agentData) => {
  * @returns {Promise<Object>} Updated agent
  */
 export const updateAgent = async (agentId, agentData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents/${agentId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(agentData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents/${agentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(agentData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to update agent');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to update agent');
-  }
 };
 
 /**
@@ -346,21 +379,21 @@ export const updateAgent = async (agentId, agentData) => {
  * @returns {Promise<Object>} Deletion result
  */
 export const deleteAgent = async (agentId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents/${agentId}`, {
-      method: 'DELETE'
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents/${agentId}`, {
+            method: 'DELETE'
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to delete agent');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to delete agent');
-  }
 };
 
 /**
@@ -369,21 +402,21 @@ export const deleteAgent = async (agentId) => {
  * @returns {Promise<Object>} Duplicated agent
  */
 export const duplicateAgent = async (agentId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents/duplicate/${agentId}`, {
-      method: 'POST'
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents/duplicate/${agentId}`, {
+            method: 'POST'
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to duplicate agent');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to duplicate agent');
-  }
 };
 
 /**
@@ -392,25 +425,25 @@ export const duplicateAgent = async (agentId) => {
  * @returns {Promise<Object>} Import result
  */
 export const bulkImportAgents = async (agents) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agents/bulk-import`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(agents)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/agents/bulk-import`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(agents)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to import agents');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to import agents');
-  }
 };
 
 // ==============================
@@ -423,22 +456,22 @@ export const bulkImportAgents = async (agents) => {
  * @returns {Promise<Object>} All phone numbers
  */
 export const getPhoneNumbers = async (type = null) => {
-  try {
-    const url = type
-      ? `${API_BASE_URL}/phone-numbers?type=${type}`
-      : `${API_BASE_URL}/phone-numbers`;
+    try {
+        const url = type
+            ? `${API_BASE_URL}/phone-numbers?type=${type}`
+            : `${API_BASE_URL}/phone-numbers`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+        const response = await fetch(url);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get phone numbers');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get phone numbers');
-  }
 };
 
 /**
@@ -447,25 +480,25 @@ export const getPhoneNumbers = async (type = null) => {
  * @returns {Promise<Object>} Saved phone number
  */
 export const savePhoneNumber = async (phoneData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/phone-numbers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(phoneData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/phone-numbers`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(phoneData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to save phone number');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to save phone number');
-  }
 };
 
 /**
@@ -474,25 +507,25 @@ export const savePhoneNumber = async (phoneData) => {
  * @returns {Promise<Object>} Updated phone number
  */
 export const updateNumberUsage = async (phoneNumber) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/phone-numbers/update-usage`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ phone_number: phoneNumber })
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/phone-numbers/update-usage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({phone_number: phoneNumber})
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to update phone number usage');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to update phone number usage');
-  }
 };
 
 /**
@@ -501,21 +534,21 @@ export const updateNumberUsage = async (phoneNumber) => {
  * @returns {Promise<Object>} Deletion result
  */
 export const deletePhoneNumber = async (numberId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/phone-numbers/${numberId}`, {
-      method: 'DELETE'
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/phone-numbers/${numberId}`, {
+            method: 'DELETE'
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to delete phone number');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to delete phone number');
-  }
 };
 
 // ==============================
@@ -527,18 +560,18 @@ export const deletePhoneNumber = async (numberId) => {
  * @returns {Promise<Object>} All campaigns
  */
 export const getCampaigns = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get campaigns');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get campaigns');
-  }
 };
 
 /**
@@ -547,18 +580,18 @@ export const getCampaigns = async () => {
  * @returns {Promise<Object>} Campaign details
  */
 export const getCampaign = async (campaignId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get campaign');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get campaign');
-  }
 };
 
 /**
@@ -567,25 +600,25 @@ export const getCampaign = async (campaignId) => {
  * @returns {Promise<Object>} Created campaign
  */
 export const createCampaign = async (campaignData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(campaignData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(campaignData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to create campaign');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to create campaign');
-  }
 };
 
 /**
@@ -595,25 +628,25 @@ export const createCampaign = async (campaignData) => {
  * @returns {Promise<Object>} Updated campaign
  */
 export const updateCampaign = async (campaignId, campaignData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(campaignData)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(campaignData)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to update campaign');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to update campaign');
-  }
 };
 
 /**
@@ -622,21 +655,21 @@ export const updateCampaign = async (campaignId, campaignData) => {
  * @returns {Promise<Object>} Deletion result
  */
 export const deleteCampaign = async (campaignId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
-      method: 'DELETE'
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
+            method: 'DELETE'
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to delete campaign');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to delete campaign');
-  }
 };
 
 /**
@@ -646,25 +679,25 @@ export const deleteCampaign = async (campaignId) => {
  * @returns {Promise<Object>} Updated campaign
  */
 export const updateCampaignStatus = async (campaignId, status) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/status`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ status })
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({status})
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to update campaign status');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to update campaign status');
-  }
 };
 
 /**
@@ -673,18 +706,18 @@ export const updateCampaignStatus = async (campaignId, status) => {
  * @returns {Promise<Object>} Campaign contacts
  */
 export const getCampaignContacts = async (campaignId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/contacts`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/contacts`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get campaign contacts');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get campaign contacts');
-  }
 };
 
 /**
@@ -694,25 +727,25 @@ export const getCampaignContacts = async (campaignId) => {
  * @returns {Promise<Object>} Added contacts
  */
 export const addCampaignContacts = async (campaignId, contacts) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/contacts`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(contacts)
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/contacts`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(contacts)
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to add campaign contacts');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to add campaign contacts');
-  }
 };
 
 /**
@@ -721,18 +754,18 @@ export const addCampaignContacts = async (campaignId, contacts) => {
  * @returns {Promise<Object>} Campaign statistics
  */
 export const getCampaignStats = async (campaignId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/stats`);
-    const data = await response.json();
+    try {
+        const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/stats`);
+        const data = await response.json();
 
-    if (!response.ok) {
-      throw { response: { data, status: response.status } };
+        if (!response.ok) {
+            throw {response: {data, status: response.status}};
+        }
+
+        return data;
+    } catch (error) {
+        return handleApiError(error, 'Failed to get campaign statistics');
     }
-
-    return data;
-  } catch (error) {
-    return handleApiError(error, 'Failed to get campaign statistics');
-  }
 };
 
 /**
@@ -740,23 +773,23 @@ export const getCampaignStats = async (campaignId) => {
  * @returns {Promise<Object>} Server status
  */
 export const getServerStatus = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL.replace('/api', '')}/status`, {
-      method: 'GET',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
+    try {
+        const response = await fetch(`${API_BASE_URL.replace('/api', '')}/status`, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
 
-    if (response.ok) {
-      return { status: 'online', timestamp: new Date().toISOString() };
-    } else {
-      return { status: 'error', message: 'Server returned an error response' };
+        if (response.ok) {
+            return {status: 'online', timestamp: new Date().toISOString()};
+        } else {
+            return {status: 'error', message: 'Server returned an error response'};
+        }
+    } catch (error) {
+        console.warn('Server status check failed:', error);
+        return {status: 'offline', message: 'Server is not responding'};
     }
-  } catch (error) {
-    console.warn('Server status check failed:', error);
-    return { status: 'offline', message: 'Server is not responding' };
-  }
 };

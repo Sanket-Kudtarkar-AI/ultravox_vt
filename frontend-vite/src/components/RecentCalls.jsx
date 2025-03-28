@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle,
-    AlertCircle, Tag, MessageSquare, FileAudio
+    AlertCircle, Tag, MessageSquare, FileAudio, ChevronLeft
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
@@ -11,7 +11,8 @@ import { getRecentCalls } from '../utils/api';
 
 const RecentCalls = ({
     onViewDetails,
-    onViewAnalysis
+    onViewAnalysis,
+    setCurrentView
 }) => {
     // State for calls data
     const [calls, setCalls] = useState([]);
@@ -119,8 +120,17 @@ const RecentCalls = ({
 
     return (
         <Card className="overflow-hidden">
-            <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
-                <h2 className="text-xl font-semibold text-white">Call History</h2>
+            <div
+                className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
+                <div className="flex items-center">
+                    <button
+                        onClick={() => setCurrentView('dashboard')} // You'll need to pass this prop
+                        className="p-2 -ml-2 mr-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-full transition-colors"
+                    >
+                        <ChevronLeft size={20}/>
+                    </button>
+                    <h2 className="text-xl font-semibold text-white">Call History</h2>
+                </div>
                 <Button
                     variant="secondary"
                     size="sm"

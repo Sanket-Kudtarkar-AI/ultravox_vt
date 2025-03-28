@@ -5,6 +5,31 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2025-03-28
+### Added
+
+- Back buttons on Recent Calls and Call Details pages
+- Settings page placeholder to prevent 404 errors
+- Custom gentle-pulse animation for softer ringing indication
+- Default agent selection in New Call form (oldest agent)
+- Outside click handling for modal dialogs
+
+### Changed
+
+- Enhanced status timeline to show meaningful call state progression
+- Improved status color indicators: green for completed, blue for in-progress
+- Updated Dashboard to properly display recent calls and statistics
+- Modified database schema to support longer recording URLs
+- Fixed agent selection to properly use agent_id
+
+### Fixed
+
+- SQL database error with recording_url column length
+- Agent selection in AgentSelector modal
+- Call status updating and display issues
+- Proper handling of Plivo API responses
+- Modal closing behavior for better UX
+
 ## [1.9.1] - 2025-03-28
 
 ### Added

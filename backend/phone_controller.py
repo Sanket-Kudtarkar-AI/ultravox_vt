@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from models import SavedPhoneNumber
-from database import get_db_session, close_db_session
+from database import get_db_session, close_db_session, get_db_session_with_retry
 from config import setup_logging
 
 # Set up logging
@@ -20,7 +20,7 @@ def get_phone_numbers():
     try:
         number_type = request.args.get('type')
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         query = db_session.query(SavedPhoneNumber)
 
         if number_type:
@@ -51,7 +51,7 @@ def get_phone_number(number_id):
     Get a specific phone number by ID
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         phone_number = db_session.query(SavedPhoneNumber).filter_by(id=number_id).first()
 
         if not phone_number:
@@ -101,7 +101,7 @@ def save_phone_number():
         if not phone_number.startswith('+'):
             phone_number = '+' + phone_number
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if number already exists
         existing_number = db_session.query(SavedPhoneNumber).filter_by(
@@ -164,7 +164,7 @@ def update_phone_number(number_id):
         data = request.json
         logger.info(f"Received update phone number request for {number_id}: {data}")
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if phone number exists
         phone_number = db_session.query(SavedPhoneNumber).filter_by(id=number_id).first()
@@ -218,7 +218,7 @@ def delete_phone_number(number_id):
     Delete a phone number
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if phone number exists
         phone_number = db_session.query(SavedPhoneNumber).filter_by(id=number_id).first()
@@ -259,7 +259,7 @@ def get_phone_number_by_number(phone_number):
         if not phone_number.startswith('+'):
             phone_number = '+' + phone_number
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         saved_number = db_session.query(SavedPhoneNumber).filter_by(phone_number=phone_number).first()
 
         if not saved_number:
@@ -301,7 +301,7 @@ def update_number_usage():
         if not phone_number.startswith('+'):
             phone_number = '+' + phone_number
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if number exists
         saved_number = db_session.query(SavedPhoneNumber).filter_by(phone_number=phone_number).first()
@@ -346,7 +346,7 @@ def bulk_import_phone_numbers():
                 "message": "Expected a JSON array of phone numbers"
             }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         imported_numbers = []
         for number_data in data:

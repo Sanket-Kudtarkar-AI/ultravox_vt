@@ -11,13 +11,18 @@ import Analysis from './components/Analysis';
 import AgentSelector from './components/AgentSelector';
 import AgentForm from './components/AgentForm';
 import CampaignManager from './components/CampaignManager';
+import Settings from './components/Settings';
 import {
     getAgents,
     getPhoneNumbers,
     savePhoneNumber,
     updateNumberUsage,
     deletePhoneNumber,
-    getServerStatus
+    getServerStatus,
+    createAgent,
+    updateAgent,
+    deleteAgent,
+    getCallStatus
 } from './utils/api';
 
 function App() {
@@ -50,6 +55,9 @@ function App() {
     const [currentPage, setCurrentPage] = useState(1);
     const [callsPerPage] = useState(20);
 
+
+    const [recentCalls, setRecentCalls] = useState([]);
+
     // Check server status on component mount and at regular intervals
     useEffect(() => {
         const checkServerStatus = async () => {
@@ -67,6 +75,30 @@ function App() {
         return () => clearInterval(intervalId);
     }, []);
 
+    // useEffect to fetch recent calls
+    useEffect(() => {
+  const fetchRecentCalls = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/recent_calls?limit=5');
+      const data = await response.json();
+      if (data.status === 'success') {
+        setRecentCalls(data.calls);
+      } else {
+        console.error('Error fetching recent calls:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching recent calls:', error);
+    }
+  };
+
+  fetchRecentCalls();
+}, []);
+
+    // Add useEffect to monitor isCreatingAgent changes for debugging
+    useEffect(() => {
+        console.log("isCreatingAgent changed to:", isCreatingAgent);
+    }, [isCreatingAgent]);
+
     // Fetch agents from API on component mount
     useEffect(() => {
         const fetchAgents = async () => {
@@ -74,11 +106,18 @@ function App() {
             try {
                 const response = await getAgents();
                 if (response.status === 'success') {
-                    setAgents(response.agents);
+                    // Sort agents by creation date (oldest first)
+                    const sortedAgents = response.agents.sort((a, b) => {
+                        const dateA = new Date(a.created_at || 0);
+                        const dateB = new Date(b.created_at || 0);
+                        return dateA - dateB; // Ascending order (oldest first)
+                    });
 
-                    // If we have agents and none is selected, select the first one
-                    if (response.agents.length > 0 && !selectedAgentId) {
-                        setSelectedAgentId(response.agents[0].agent_id);
+                    setAgents(sortedAgents);
+
+                    // ALWAYS select the first (oldest) agent if any agents are available
+                    if (sortedAgents.length > 0) {
+                        setSelectedAgentId(sortedAgents[0].agent_id);
                     }
                 } else {
                     console.error('Error fetching agents:', response.message);
@@ -144,31 +183,159 @@ function App() {
 
     // Handle agent editing
     const handleEditAgent = (agentId) => {
+        console.log("Edit agent called with ID:", agentId);
+        console.log("Available agents:", agents);
+
+        // Find the agent in our state
         const agent = agents.find(a => a.agent_id === agentId);
-        setAgentToEdit(agent);
-        setIsCreatingAgent(true);
+        console.log("Found agent:", agent);
+
+        if (agent) {
+            // Format the agent data for the form
+            const formattedAgent = {
+                id: agent.agent_id,
+                name: agent.name,
+                system_prompt: agent.system_prompt,
+                // Parse JSON strings back to objects if needed
+                initial_messages: typeof agent.initial_messages === 'string'
+                    ? JSON.parse(agent.initial_messages)
+                    : agent.initial_messages,
+                settings: typeof agent.settings === 'string'
+                    ? JSON.parse(agent.settings)
+                    : agent.settings
+            };
+
+            console.log("Formatted agent for form:", formattedAgent);
+            setAgentToEdit(formattedAgent);
+            setIsCreatingAgent(true);
+
+            // Close the agent modal if it's open
+            if (isAgentModalOpen) {
+                setIsAgentModalOpen(false);
+            }
+        } else {
+            console.error('Agent not found with ID:', agentId);
+        }
     };
 
     // Handle agent duplication
     const handleDuplicateAgent = async (agentId) => {
-        // This should now call the API to duplicate
-        console.log('Duplicating agent:', agentId);
-        // API call would go here
+        try {
+            const response = await fetch(`http://localhost:5000/api/agents/duplicate/${agentId}`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Refresh the agents list to show the new agent
+                const agentsResponse = await getAgents();
+                if (agentsResponse.status === 'success') {
+                    // Sort by creation date before updating state
+                    const sortedAgents = agentsResponse.agents.sort((a, b) => {
+                        const dateA = new Date(a.created_at || 0);
+                        const dateB = new Date(b.created_at || 0);
+                        return dateA - dateB; // Oldest first
+                    });
+
+                    setAgents(sortedAgents);
+                    alert('Agent duplicated successfully');
+                }
+            } else {
+                console.error('Error duplicating agent:', data.message);
+                alert(`Error duplicating agent: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error duplicating agent:', error);
+            alert('Error duplicating agent. Please try again.');
+        }
     };
 
     // Handle agent deletion
     const handleDeleteAgent = async (agentId) => {
-        // This should now call the API to delete
-        console.log('Deleting agent:', agentId);
-        // API call would go here
+        console.log("Delete called with agent ID:", agentId);
+        console.log("All agents:", agents);
+
+        // Add confirmation for safety
+        if (window.confirm('Are you sure you want to delete this agent?')) {
+            try {
+                // Only proceed if we have a valid ID
+                if (!agentId) {
+                    alert('Cannot delete agent: ID is undefined');
+                    return;
+                }
+
+                const response = await deleteAgent(agentId);
+
+                if (response.status === 'success') {
+                    // Remove agent from local state
+                    setAgents(prev => prev.filter(agent => agent.agent_id !== agentId));
+
+                    // If the deleted agent was selected, clear the selection
+                    if (selectedAgentId === agentId) {
+                        setSelectedAgentId(null);
+                    }
+
+                    // Show success notification
+                    alert('Agent deleted successfully');
+                } else {
+                    console.error('Error deleting agent:', response.message);
+                    alert(`Error deleting agent: ${response.message}`);
+                }
+            } catch (error) {
+                console.error('Error deleting agent:', error);
+                alert('Error deleting agent. Please try again.');
+            }
+        }
     };
 
     // Handle agent save (create or update)
-    const handleSaveAgent = async (agent) => {
-        // This should now call the API to save
-        console.log('Saving agent:', agent);
-        // API call would go here
-        setIsCreatingAgent(false);
+    const handleSaveAgent = async (agentData) => {
+        setIsLoadingAgents(true);
+        console.log("About to save agent data:", agentData);
+
+        try {
+            let response;
+
+            if (agentData.id) {
+                // If the agent has an ID, it's an update
+                response = await updateAgent(agentData.id, agentData);
+            } else {
+                // Otherwise it's a new agent
+                response = await createAgent(agentData);
+            }
+
+            if (response.status === 'success') {
+                // Refresh the agents list to show the new/updated agent
+                const agentsResponse = await getAgents();
+                if (agentsResponse.status === 'success') {
+                    // Sort by creation date before updating state
+                    const sortedAgents = agentsResponse.agents.sort((a, b) => {
+                        const dateA = new Date(a.created_at || 0);
+                        const dateB = new Date(b.created_at || 0);
+                        return dateA - dateB; // Oldest first
+                    });
+
+                    setAgents(sortedAgents);
+
+                    // If it was a new agent, select it
+                    if (!agentData.id && response.agent) {
+                        setSelectedAgentId(response.agent.agent_id);
+                    }
+                }
+
+                // Close the creation modal
+                setIsCreatingAgent(false);
+            } else {
+                console.error('Error saving agent:', response.message);
+                alert(`Error saving agent: ${response.message}`);
+            }
+        } catch (error) {
+            console.error('Error saving agent:', error);
+            alert('Error saving agent. Please try again.');
+        } finally {
+            setIsLoadingAgents(false);
+        }
     };
 
     // Handle adding a new recipient phone number
@@ -269,6 +436,64 @@ function App() {
         }
     };
 
+    // Refresh call status function with improved handling
+    const refreshCallStatus = async () => {
+        if (!activeCall || !activeCall.call_uuid) return;
+
+        try {
+            const response = await getCallStatus(activeCall.call_uuid);
+
+            if (response.status === 'success') {
+                // Get current status
+                const newStatus = response.call_status ||
+                    (response.phase === 'completed' ? 'completed' : 'unknown');
+
+                // Only add to history if status has changed
+                const lastStatus = activeCall.statusHistory &&
+                activeCall.statusHistory.length > 0 ?
+                    activeCall.statusHistory[activeCall.statusHistory.length - 1].status : null;
+
+                // Normalize status names for better timeline display
+                let displayStatus = newStatus;
+                if (response.phase === 'completed' && response.details && response.details.call_state === 'ANSWER') {
+                    displayStatus = 'completed';
+                } else if (newStatus.toLowerCase() === 'in-progress') {
+                    displayStatus = 'in-progress';
+                } else if (newStatus.toLowerCase() === 'ringing') {
+                    displayStatus = 'ringing';
+                }
+
+                // Only update if status changed and avoid duplicates
+                if (displayStatus !== lastStatus) {
+                    setActiveCall(prev => ({
+                        ...prev,
+                        phase: response.phase,
+                        call_status: newStatus,
+                        details: response.details,
+                        timestamp: new Date().toISOString(),
+                        statusHistory: [
+                            ...(prev.statusHistory || []),
+                            {status: displayStatus, time: new Date().toISOString()}
+                        ]
+                    }));
+                } else {
+                    // Update without adding to history
+                    setActiveCall(prev => ({
+                        ...prev,
+                        phase: response.phase,
+                        call_status: newStatus,
+                        details: response.details,
+                        timestamp: new Date().toISOString()
+                    }));
+                }
+            } else {
+                console.error('Error refreshing call status:', response.message);
+            }
+        } catch (error) {
+            console.error('Error refreshing call status:', error);
+        }
+    };
+
     // Handle initiating a call
     const handleMakeCall = async (callData) => {
         setIsLoadingCall(true);
@@ -300,8 +525,22 @@ function App() {
                     await updateNumberUsage(callData.plivo_phone_number);
                 }
 
+                // Initialize the active call with phase info
+                const activeCallData = {
+                    ...data,
+                    phase: 'live', // Start with live phase
+                    call_status: 'initiating',
+                    statusHistory: [
+                        {status: 'initiating', time: new Date().toISOString()}
+                    ],
+                    // Add other call data
+                    recipient_phone_number: callData.recipient_phone_number,
+                    plivo_phone_number: callData.plivo_phone_number,
+                    system_prompt: callData.system_prompt
+                };
+
                 // Set the active call and switch to the call status view
-                setActiveCall(data);
+                setActiveCall(activeCallData);
                 setCurrentView('call-status');
             } else {
                 console.error('Error making call:', data.message);
@@ -333,7 +572,7 @@ function App() {
             case 'dashboard':
                 return (
                     <Dashboard
-                        recentCalls={[]} // This would now be fetched from the API as needed
+                        recentCalls={recentCalls} // Pass actual recentCalls instead of empty array
                         agents={agents}
                         onCreateAgent={handleCreateAgent}
                         onSelectAgent={handleEditAgent}
@@ -361,9 +600,8 @@ function App() {
                 return (
                     <CallStatus
                         call={activeCall}
-                        onRefreshStatus={() => {/* Implement refresh */
-                        }}
-                        loading={false}
+                        onRefreshStatus={refreshCallStatus}
+                        loading={isLoadingCall}
                         onViewAnalysis={handleViewCallAnalysis}
                     />
                 );
@@ -372,6 +610,7 @@ function App() {
                     <RecentCalls
                         onViewDetails={handleViewCallDetails}
                         onViewAnalysis={handleViewCallAnalysis}
+                        setCurrentView={setCurrentView} // Add this prop
                     />
                 );
             case 'call-details':
@@ -382,6 +621,7 @@ function App() {
                         }}
                         loading={false}
                         onViewAnalysis={handleViewCallAnalysis}
+                        onBack={() => setCurrentView('recent-calls')} // Add this prop
                     />
                 );
             case 'call-analysis':
@@ -402,6 +642,10 @@ function App() {
                         savedFromNumbers={savedFromNumbers}
                         API_BASE_URL="http://localhost:5000/api"
                     />
+                );
+            case 'settings':
+                return (
+                    <Settings setCurrentView={setCurrentView}/>
                 );
             default:
                 return <div>404 - View not found</div>;
@@ -436,18 +680,26 @@ function App() {
                 agents={agents}
                 onSelectAgent={handleSelectAgent}
                 onCreateNewAgent={handleCreateAgent}
+                selectedAgentId={selectedAgentId}
+                closeOnOutsideClick={true} // Add this prop
             />
 
             {/* Agent Form Modal - For creating and editing agents */}
             {isCreatingAgent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-4xl">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    onClick={(e) => {
+                        // Only close if clicking the backdrop, not the form itself
+                        if (e.target === e.currentTarget) setIsCreatingAgent(false);
+                    }}
+                >
+                    <div className="w-full max-w-4xl" onClick={e => e.stopPropagation()}>
                         <AgentForm
                             agent={agentToEdit}
                             isEditing={!!agentToEdit}
                             onSave={handleSaveAgent}
                             onCancel={() => setIsCreatingAgent(false)}
-                            loading={false}
+                            loading={isLoadingAgents}
                         />
                     </div>
                 </div>

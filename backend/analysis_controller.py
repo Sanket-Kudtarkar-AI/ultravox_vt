@@ -10,7 +10,7 @@ import re
 import json
 from datetime import datetime
 from models import CallLog, CallAnalytics
-from database import get_db_session, close_db_session
+from database import get_db_session, close_db_session, get_db_session_with_retry
 
 # Set up logging
 logger = setup_logging("analysis_controller", "analysis_controller.log")
@@ -30,7 +30,7 @@ def proxy_audio(url):
         # Decode the URL if it's URL-encoded
         import urllib.parse
         decoded_url = urllib.parse.unquote(url)
-
+        print(f"Decoded url:\n{decoded_url}")
         # Fetch the audio file
         response = requests.get(decoded_url, stream=True)
 
@@ -82,7 +82,7 @@ def get_call_transcription(call_id):
         logger.info(f"Fetching transcription for call ID: {call_id}")
 
         # First check if we have this transcription cached in the database
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         call_log = db_session.query(CallLog).filter_by(ultravox_id=call_id).first()
 
         # If we have the transcription cached and it's not requested to refresh
@@ -162,7 +162,7 @@ def get_call_recording(call_id):
         logger.info(f"Fetching recording URL for call ID: {call_id}")
 
         # First check if we have this recording URL cached in the database
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         call_log = db_session.query(CallLog).filter_by(ultravox_id=call_id).first()
 
         # If we have the recording URL cached and it's not requested to refresh
@@ -235,7 +235,7 @@ def get_call_analytics(call_id, call_uuid):
         logger.info(f"Fetching analytics for call ID: {call_id}, call UUID: {call_uuid}")
 
         # First check if we have this analytics data cached
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         call_log = db_session.query(CallLog).filter_by(ultravox_id=call_id, call_uuid=call_uuid).first()
 
         # If call doesn't exist in our DB by Ultravox ID, try by call UUID
@@ -524,7 +524,7 @@ def analyze_transcript(call_id):
             }), 500
 
         # Get the call transcript
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         call_log = db_session.query(CallLog).filter_by(ultravox_id=call_id).first()
 
         if not call_log:

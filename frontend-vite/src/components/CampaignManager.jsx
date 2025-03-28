@@ -253,7 +253,7 @@ const CampaignManager = ({
 
   // Get selected agent data
   const getSelectedAgentData = () => {
-    return agents.find(agent => agent.id === selectedAgent) || null;
+    return agents.find(agent => agent.agent_id === selectedAgent) || null;
   };
 
   // Format timestamp
@@ -283,7 +283,7 @@ const CampaignManager = ({
                 id="agent"
                 value={selectedAgent}
                 onChange={(e) => setSelectedAgent(e.target.value)}
-                options={agents.map(agent => ({ value: agent.id, label: agent.name }))}
+                options={agents.map(agent => ({ value: agent.agent_id, label: agent.name }))}
                 placeholder="Select an agent"
                 required
               />

@@ -10,7 +10,7 @@ from config import PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN, NGROK_URL, setup_logging, SY
     ULTRAVOX_API_BASE_URL, ULTRAVOX_API_KEY
 from utils import get_join_url
 from models import CallMapping, CallLog, Agent, Campaign, CampaignContact, SavedPhoneNumber
-from database import get_db_session, close_db_session
+from database import get_db_session, close_db_session, get_db_session_with_retry
 import traceback
 
 # Set up logging
@@ -75,11 +75,11 @@ def make_call_api():
         initial_messages = data.get("initial_messages", [])
         # Format for Ultravox API - it only needs the text field
         formatted_initial_messages = []
-        for msg in initial_messages:
-            if isinstance(msg, str):
-                formatted_initial_messages.append({"text": msg})
-            elif isinstance(msg, dict) and "text" in msg:
-                formatted_initial_messages.append({"text": msg["text"]})
+        # for msg in initial_messages:
+        #     if isinstance(msg, str):
+        #         formatted_initial_messages.append({"text": msg})
+        #     elif isinstance(msg, dict) and "text" in msg:
+        #         formatted_initial_messages.append({"text": msg["text"]})
 
         inactivity_messages = data.get("inactivity_messages", [{"duration": "8s", "message": "are you there?"}])
         recording_enabled = data.get("recording_enabled", True)
@@ -90,7 +90,7 @@ def make_call_api():
 
         # Check if agent exists if agent_id is provided
         agent = None
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         try:
             if agent_id:
                 agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
@@ -123,11 +123,11 @@ def make_call_api():
                     initial_messages = json.loads(agent.initial_messages)
                     # Format initial messages for Ultravox API
                     formatted_initial_messages = []
-                    for msg in initial_messages:
-                        if isinstance(msg, str):
-                            formatted_initial_messages.append({"text": msg})
-                        elif isinstance(msg, dict) and "text" in msg:
-                            formatted_initial_messages.append({"text": msg["text"]})
+                    # for msg in initial_messages:
+                    #     if isinstance(msg, str):
+                    #         formatted_initial_messages.append({"text": msg})
+                    #     elif isinstance(msg, dict) and "text" in msg:
+                    #         formatted_initial_messages.append({"text": msg["text"]})
 
             # Check campaign if campaign_id is provided
             campaign = None
@@ -310,194 +310,130 @@ def make_call_api():
 @api.route('/call_status/<call_uuid>', methods=['GET'])
 def get_call_status(call_uuid):
     """
-    Get the status of a call by UUID
-    Enhanced to work with the new database schema
+    Get the status of a call by UUID with improved handling for different Plivo APIs
     """
     try:
-        # Initialize Plivo client
+        status_param = request.args.get('status')
         plivo_client = plivo.RestClient(PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN)
 
-        # Get the call data from our database
-        db_session = get_db_session()
-        call_data = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+        # Get database session to check and update our records
+        db_session = get_db_session_with_retry()
+        call_log = None
 
-        # If call not in our database, try legacy mapping
-        ultravox_call_id = None
-        if not call_data:
-            # Try to get from legacy mapping
-            call_mapping = db_session.query(CallMapping).filter_by(plivo_call_uuid=call_uuid).first()
-            if call_mapping:
-                ultravox_call_id = call_mapping.ultravox_call_id
-
-                # Create a new CallLog record from the mapping
-                try:
-                    new_call = CallLog(
-                        call_uuid=call_mapping.plivo_call_uuid,
-                        ultravox_id=call_mapping.ultravox_call_id,
-                        to_number=call_mapping.recipient_phone_number,
-                        from_number=call_mapping.plivo_phone_number,
-                        system_prompt=call_mapping.system_prompt,
-                        initiation_time=call_mapping.timestamp
-                    )
-
-                    db_session.add(new_call)
-                    db_session.commit()
-                    db_session.refresh(new_call)
-
-                    # Use the newly created record
-                    call_data = new_call
-
-                except Exception as e:
-                    logger.error(f"Error creating CallLog from legacy mapping: {str(e)}")
-        else:
-            ultravox_call_id = call_data.ultravox_id
-
-        # Only log this message once per minute per call_uuid
-        current_time = time.time()
-        last_log_time = getattr(get_call_status, f'last_log_time_{call_uuid}', 0)
-        if current_time - last_log_time > 60:  # Log once per minute
-            logger.info(f"Call status check for {call_uuid}")
-            logger.info(f"Ultravox call ID for {call_uuid}: {ultravox_call_id}")
-            setattr(get_call_status, f'last_log_time_{call_uuid}', current_time)
-
-        # Try to get live call status first
         try:
-            # Use the correct method for getting live call details
-            response = plivo_client.live_calls.get(call_uuid)
+            # Check if we have a record for this call
+            call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
+        except Exception as e:
+            logger.warning(f"Error checking call log: {str(e)}")
+            # Continue even if DB check fails
 
-            # Update the call status in our database
-            if call_data:
-                call_data.call_state = response.call_status if hasattr(response, 'call_status') else None
-                # Store the full Plivo response
-                plivo_data = {}
-                for attr in dir(response):
-                    if not attr.startswith('_') and not callable(getattr(response, attr)):
-                        plivo_data[attr] = getattr(response, attr)
-
-                call_data.plivo_data = json.dumps(plivo_data)
-                db_session.commit()
-
-            return jsonify({
-                "status": "success",
-                "call_status": "live",
-                "ultravox_call_id": ultravox_call_id,
-                "details": {
-                    "direction": response.direction if hasattr(response, 'direction') else None,
-                    "from": response.from_number if hasattr(response, 'from_number') else None,
-                    "to": response.to if hasattr(response, 'to') else None,
-                    "call_status": response.call_status if hasattr(response, 'call_status') else None,
-                    "caller_name": response.caller_name if hasattr(response, 'caller_name') else None,
-                    "call_uuid": response.call_uuid if hasattr(response, 'call_uuid') else None,
-                    "session_start": response.session_start if hasattr(response, 'session_start') else None
-                }
-            })
-        except plivo.exceptions.ResourceNotFoundError:
-            # Only log this message once per call status check within a time period
-            if not hasattr(get_call_status, f'checked_history_{call_uuid}'):
-                logger.info(f"Live call not found for UUID {call_uuid}. Checking call history.")
-                setattr(get_call_status, f'checked_history_{call_uuid}', True)
-
-                # Reset after 5 minutes
-                def reset_flag():
-                    if hasattr(get_call_status, f'checked_history_{call_uuid}'):
-                        delattr(get_call_status, f'checked_history_{call_uuid}')
-
-                timer = threading.Timer(300, reset_flag)
-                timer.daemon = True
-                timer.start()
-
+        if status_param == 'live':
+            # Try to get live call details
             try:
-                response = plivo_client.calls.get(call_uuid)
+                response = plivo_client.live_calls.get(call_uuid)
 
-                # Update the call record in our database with proper datetime parsing
-                if call_data:
-                    call_data.call_state = response.call_state if hasattr(response, 'call_state') else None
-                    call_data.call_duration = int(response.call_duration) if hasattr(response,
-                                                                                     'call_duration') else None
+                # Create response with all available fields
+                live_data = {
+                    "api_id": getattr(response, 'api_id', None),
+                    "call_status": getattr(response, 'call_status', None),
+                    "call_uuid": getattr(response, 'call_uuid', call_uuid),
+                    "caller_name": getattr(response, 'caller_name', ''),
+                    "direction": getattr(response, 'direction', None),
+                    "from_number": getattr(response, 'from_number', None),
+                    "request_uuid": getattr(response, 'request_uuid', None),
+                    "session_start": getattr(response, 'session_start', None),
+                    "to": getattr(response, 'to', None),
+                    "stir_attestation": getattr(response, 'stir_attestation', 'N/A'),
+                    "stir_verification": getattr(response, 'stir_verification', 'N/A')
+                }
 
-                    # Parse datetime strings properly
-                    if hasattr(response, 'answer_time') and response.answer_time:
-                        call_data.answer_time = parse_plivo_datetime(response.answer_time)
-
-                    if hasattr(response, 'end_time') and response.end_time:
-                        call_data.end_time = parse_plivo_datetime(response.end_time)
-
-                    if hasattr(response, 'initiation_time') and response.initiation_time:
-                        call_data.initiation_time = parse_plivo_datetime(response.initiation_time)
-
-                    call_data.hangup_cause = response.hangup_cause_name if hasattr(response,
-                                                                                   'hangup_cause_name') else None
-                    call_data.hangup_source = response.hangup_source if hasattr(response, 'hangup_source') else None
-
-                    # Store the full Plivo response
-                    plivo_data = {}
-                    for attr in dir(response):
-                        if not attr.startswith('_') and not callable(getattr(response, attr)):
-                            plivo_data[attr] = getattr(response, attr)
-
-                    call_data.plivo_data = json.dumps(plivo_data)
+                # Update call log if we have one
+                if call_log:
+                    call_log.call_state = live_data['call_status']
+                    # Store the JSON data for reference
+                    call_log.plivo_data = json.dumps(live_data)
                     db_session.commit()
-
-                    # If this is a campaign call, update the contact status
-                    if call_data.campaign_id:
-                        contact = db_session.query(CampaignContact).filter_by(
-                            call_uuid=call_uuid
-                        ).first()
-
-                        if contact and contact.status == 'calling':
-                            # Determine the new status based on call state
-                            new_status = 'completed'  # Default
-
-                            if response.call_state != 'ANSWER':
-                                if response.call_state == 'BUSY':
-                                    new_status = 'busy'
-                                elif response.call_state == 'NO_ANSWER':
-                                    new_status = 'no-answer'
-                                else:
-                                    new_status = 'failed'
-
-                            contact.status = new_status
-                            db_session.commit()
 
                 return jsonify({
                     "status": "success",
-                    "call_status": "completed",
-                    "ultravox_call_id": ultravox_call_id,
-                    "details": {
-                        "answer_time": response.answer_time if hasattr(response, 'answer_time') else None,
-                        "bill_duration": response.bill_duration if hasattr(response, 'bill_duration') else None,
-                        "call_direction": response.call_direction if hasattr(response, 'call_direction') else None,
-                        "call_duration": response.call_duration if hasattr(response, 'call_duration') else None,
-                        "call_state": response.call_state if hasattr(response, 'call_state') else None,
-                        "call_uuid": response.call_uuid if hasattr(response, 'call_uuid') else None,
-                        "end_time": response.end_time if hasattr(response, 'end_time') else None,
-                        "from_number": response.from_number if hasattr(response, 'from_number') else None,
-                        "to_number": response.to_number if hasattr(response, 'to_number') else None,
-                        "hangup_cause_name": response.hangup_cause_name if hasattr(response,
-                                                                                   'hangup_cause_name') else None,
-                        "hangup_source": response.hangup_source if hasattr(response, 'hangup_source') else None,
-                        "initiation_time": response.initiation_time if hasattr(response, 'initiation_time') else None
-                    }
+                    "call_status": live_data['call_status'],
+                    "details": live_data
                 })
+
             except plivo.exceptions.ResourceNotFoundError:
+                # Call is not live anymore
+                return jsonify({
+                    "status": "error",
+                    "error": "call not found"
+                }), 404
+
+        else:
+            # Try to get completed call details
+            try:
+                response = plivo_client.calls.get(call_uuid)
+
+                # Create complete call data dictionary with all fields
+                call_data = {
+                    "answer_time": getattr(response, 'answer_time', None),
+                    "api_id": getattr(response, 'api_id', None),
+                    "bill_duration": getattr(response, 'bill_duration', 0),
+                    "billed_duration": getattr(response, 'billed_duration', 0),
+                    "call_direction": getattr(response, 'call_direction', None),
+                    "call_duration": getattr(response, 'call_duration', 0),
+                    "call_state": getattr(response, 'call_state', None),
+                    "call_uuid": getattr(response, 'call_uuid', call_uuid),
+                    "cnam_lookup": getattr(response, 'cnam_lookup', 'N/A'),
+                    "conference_uuid": getattr(response, 'conference_uuid', None),
+                    "end_time": getattr(response, 'end_time', None),
+                    "from_number": getattr(response, 'from_number', None),
+                    "hangup_cause_code": getattr(response, 'hangup_cause_code', None),
+                    "hangup_cause_name": getattr(response, 'hangup_cause_name', None),
+                    "hangup_source": getattr(response, 'hangup_source', None),
+                    "initiation_time": getattr(response, 'initiation_time', None),
+                    "parent_call_uuid": getattr(response, 'parent_call_uuid', None),
+                    "resource_uri": getattr(response, 'resource_uri', None),
+                    "source_ip": getattr(response, 'source_ip', 'N/A'),
+                    "stir_attestation": getattr(response, 'stir_attestation', 'N/A'),
+                    "stir_verification": getattr(response, 'stir_verification', 'N/A'),
+                    "to_number": getattr(response, 'to_number', None),
+                    "total_amount": getattr(response, 'total_amount', "0.00000"),
+                    "total_rate": getattr(response, 'total_rate', "0.00000"),
+                    "voice_network_group": getattr(response, 'voice_network_group', 'N/A')
+                }
+
+                # Update call log if we have one
+                if call_log:
+                    # Update essential fields
+                    call_log.call_state = call_data['call_state']
+                    call_log.call_duration = int(call_data['call_duration']) if call_data['call_duration'] else 0
+
+                    # Parse datetime strings properly
+                    if call_data['answer_time']:
+                        call_log.answer_time = parse_plivo_datetime(call_data['answer_time'])
+                    if call_data['end_time']:
+                        call_log.end_time = parse_plivo_datetime(call_data['end_time'])
+                    if call_data['initiation_time']:
+                        call_log.initiation_time = parse_plivo_datetime(call_data['initiation_time'])
+
+                    call_log.hangup_cause = call_data['hangup_cause_name']
+                    call_log.hangup_source = call_data['hangup_source']
+
+                    # Store the JSON data for reference
+                    call_log.plivo_data = json.dumps(call_data)
+                    db_session.commit()
+
+                return jsonify({
+                    "status": "success",
+                    "call": call_data
+                })
+
+            except plivo.exceptions.ResourceNotFoundError:
+                # Call truly doesn't exist
                 return jsonify({
                     "status": "error",
                     "message": "Call not found in either live or completed calls"
                 }), 404
-            except Exception as e:
-                logger.error(f"Error getting completed call details: {str(e)}")
-                logger.error(traceback.format_exc())
-                return jsonify({
-                    "status": "error",
-                    "message": f"Error getting completed call details: {str(e)}"
-                }), 500
-        except Exception as e:
-            logger.error(f"Error getting live call: {str(e)}")
-            logger.error(traceback.format_exc())
-            return jsonify({
-                "status": "error",
-                "message": f"Error getting live call: {str(e)}"
-            }), 500
+
     except Exception as e:
         logger.error(f"Error in get_call_status: {str(e)}")
         logger.error(traceback.format_exc())
@@ -511,6 +447,7 @@ def get_call_status(call_uuid):
         except:
             pass
 
+
 @api.route('/recent_calls', methods=['GET'])
 def get_recent_calls():
     """
@@ -522,7 +459,7 @@ def get_recent_calls():
         limit = int(request.args.get('limit', '20'))
         offset = int(request.args.get('offset', '0'))
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Query the CallLog table
         total_count = db_session.query(CallLog).count()
@@ -604,7 +541,7 @@ def get_call_details(call_uuid):
     Get detailed information about a specific call
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Get the call from our database
         call = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
@@ -669,7 +606,7 @@ def get_call_mapping(call_uuid):
     Enhanced to use the CallLog table first
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # First try to get the mapping from CallLog
         call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()
@@ -725,7 +662,7 @@ def set_call_mapping(call_uuid, ultravox_call_id):
     Enhanced to update CallLog as well
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if call exists in CallLog
         call_log = db_session.query(CallLog).filter_by(call_uuid=call_uuid).first()

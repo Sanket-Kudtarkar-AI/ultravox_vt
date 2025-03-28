@@ -3,7 +3,7 @@ import logging
 import uuid
 from flask import Blueprint, request, jsonify
 from models import Agent
-from database import get_db_session, close_db_session
+from database import get_db_session, close_db_session, get_db_session_with_retry
 from config import setup_logging
 
 # Set up logging
@@ -19,7 +19,7 @@ def get_agents():
     Get all agents
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         agents = db_session.query(Agent).all()
 
         return jsonify({
@@ -42,7 +42,7 @@ def get_agent(agent_id):
     Get a specific agent by ID
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
         agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
 
         if not agent:
@@ -91,7 +91,7 @@ def create_agent():
         initial_messages = data.get("initial_messages", [])
         settings = data.get("settings", {})
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if agent with this ID already exists
         existing_agent = db_session.query(Agent).filter_by(agent_id=data["agent_id"]).first()
@@ -141,7 +141,7 @@ def update_agent(agent_id):
         data = request.json
         logger.info(f"Received update agent request for {agent_id}: {data}")
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if agent exists
         agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
@@ -193,7 +193,7 @@ def delete_agent(agent_id):
     Delete an agent
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if agent exists
         agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
@@ -230,7 +230,7 @@ def duplicate_agent(agent_id):
     Duplicate an existing agent
     """
     try:
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         # Check if source agent exists
         source_agent = db_session.query(Agent).filter_by(agent_id=agent_id).first()
@@ -288,7 +288,7 @@ def bulk_import_agents():
                 "message": "Expected a JSON array of agents"
             }), 400
 
-        db_session = get_db_session()
+        db_session = get_db_session_with_retry()
 
         imported_agents = []
         for agent_data in data:

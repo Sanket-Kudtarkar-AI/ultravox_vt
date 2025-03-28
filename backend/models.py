@@ -198,7 +198,7 @@ class CallLog(Base):
     plivo_data = Column(Text)  # JSON serialized full response #
     ultravox_data = Column(Text)  # JSON serialized full response #
     transcription = Column(Text)  # JSON serialized #
-    recording_url = Column(String(500)) #
+    recording_url = Column(Text) #
     summary = Column(Text) #
 
     # System settings

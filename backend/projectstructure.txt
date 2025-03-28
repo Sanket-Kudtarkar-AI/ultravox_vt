@@ -51,6 +51,7 @@ Directory structure:
             │   ├── EntityAnalysis.jsx
             │   ├── NewCallForm.jsx
             │   ├── RecentCalls.jsx
+            │   ├── Settings.jsx
             │   ├── Sidebar.jsx
             │   ├── WaveformPlayer.jsx
             │   └── ui/

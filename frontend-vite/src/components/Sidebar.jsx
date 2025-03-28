@@ -146,64 +146,48 @@ const Sidebar = ({
                     {/* List of agents */}
                     {isAgentsExpanded && (
                         <ul className="pl-8 space-y-1 mt-1">
-                            {agents.length === 0 ? (
-                                <li className="text-sm text-gray-500 py-1 px-3">
-                                    No agents created yet
-                                </li>
-                            ) : (
-                                agents.map((agent, index) => (
-                                    <li key={agent.id} className="relative group"
-                                        style={{animationDelay: `${150 + index * 50}ms`}}>
-                                        <button
-                                            onClick={() => onSelectAgent(agent.id)}
-                                            className={`
-                        w-full text-left flex items-center py-1.5 px-3 text-sm rounded-lg transition-all duration-200
-                        ${selectedAgentId === agent.id
-                                                ? 'bg-primary-900/40 text-primary-300'
-                                                : 'text-gray-400 hover:bg-dark-700/50 hover:text-white'
-                                            }
-                      `}
-                                        >
-                                            {agent.name}
-                                        </button>
+                            {agents.map((agent, index) => (
+                                <li key={agent.agent_id} className="relative group"
+                                    style={{animationDelay: `${150 + index * 50}ms`}}>
+                                    <button
+                                        onClick={() => onEditAgent(agent.agent_id)}  // Make sure we're using agent.agent_id
+                                        className={`w-full text-left flex items-center py-1.5 px-3 text-sm rounded-lg transition-all duration-200
+        ${selectedAgentId === agent.agent_id
+                                            ? 'bg-primary-900/40 text-primary-300'
+                                            : 'text-gray-400 hover:bg-dark-700/50 hover:text-white'
+                                        }
+      `}
+                                    >
+                                        {agent.name}
+                                    </button>
 
-                                        {/* Action buttons - visible on hover */}
-                                        <div
-                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onEditAgent(agent.id);
-                                                }}
-                                                className="p-1 text-gray-400 hover:text-primary-400 rounded focus:outline-none"
-                                                title="Edit"
-                                            >
-                                                <Edit size={14}/>
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onDuplicateAgent(agent.id);
-                                                }}
-                                                className="p-1 text-gray-400 hover:text-primary-400 rounded focus:outline-none"
-                                                title="Duplicate"
-                                            >
-                                                <Copy size={14}/>
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onDeleteAgent(agent.id);
-                                                }}
-                                                className="p-1 text-gray-400 hover:text-red-400 rounded focus:outline-none"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={14}/>
-                                            </button>
-                                        </div>
-                                    </li>
-                                ))
-                            )}
+                                    {/* Action buttons - visible on hover (EDIT BUTTON REMOVED) */}
+                                    <div
+                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
+                                        {/* Edit button removed */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDuplicateAgent(agent.agent_id);
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-primary-400 rounded focus:outline-none"
+                                            title="Duplicate"
+                                        >
+                                            <Copy size={14}/>
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteAgent(agent.agent_id);
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-red-400 rounded focus:outline-none"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+                                </li>
+                            ))}
                         </ul>
                     )}
                 </li>
