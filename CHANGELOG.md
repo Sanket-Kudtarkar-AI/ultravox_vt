@@ -6,6 +6,53 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2025-03-28
+
+### Added
+- Database connection retry logic to handle transient connection failures
+- Added recentCalls state and fetching in App.jsx
+- Proper error handling for SQL Server connection issues
+- Custom CSS animation for gentler status indicators
+- Settings page component to prevent 404 errors
+
+### Changed
+- Modified CallStatus component to use appropriate colors:
+  - Green for completed calls
+  - Blue for in-progress calls
+  - White for initiating calls
+- Updated modal components to close when clicking outside
+- Enhanced dashboard to show actual recent call data
+- Improved agent selection when starting new calls
+
+### Fixed
+- Database column length issue for recording URLs
+- Connection handling for Azure SQL database
+- Agent selection in floating windows
+- Default agent selection on New Call form
+- Status timeline display to show meaningful progression
+
+## [1.9.2] - 2025-03-28
+
+### Added
+- Back buttons on Recent Calls and Call Details pages
+- Settings page placeholder to prevent 404 errors
+- Custom gentle-pulse animation for softer ringing indication
+- Default agent selection in New Call form (oldest agent)
+- Outside click handling for modal dialogs
+
+### Changed
+- Enhanced status timeline to show meaningful call state progression
+- Improved status color indicators: green for completed, blue for in-progress
+- Updated Dashboard to properly display recent calls and statistics
+- Modified database schema to support longer recording URLs
+- Fixed agent selection to properly use agent_id
+
+### Fixed
+- SQL database error with recording_url column length
+- Agent selection in AgentSelector modal
+- Call status updating and display issues
+- Proper handling of Plivo API responses
+- Modal closing behavior for better UX
 
 ## [1.9.2] - 2025-03-28
 ### Added

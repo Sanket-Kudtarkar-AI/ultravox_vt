@@ -1,67 +1,65 @@
-Directory structure:
-└── ultravoxcalls/
-    ├── CHANGELOG.md
-    ├── get_started.md
-    ├── plivo_get_calls.md
-    ├── requirements.txt
-    ├── ultravox_get_calls.md
-    ├── backend/
-    │   ├── agent_controller.py
-    │   ├── analysis_controller.py
-    │   ├── api_controller.py
-    │   ├── calls.db
-    │   ├── campaign_controller.py
-    │   ├── config.py
-    │   ├── database.py
-    │   ├── get_started.md
-    │   ├── models.py
-    │   ├── phone_controller.py
-    │   ├── plivo_server.py
-    │   ├── projectstructure.txt
-    │   ├── requirements.txt
-    │   ├── simple_call.py
-    │   ├── test.py
-    │   └── utils.py
-    └── frontend-vite/
-        ├── README.md
-        ├── eslint.config.js
-        ├── index.html
-        ├── package-lock.json
-        ├── package.json
-        ├── postcss.config.js
-        ├── tailwind.config.js
-        ├── vite.config.js
-        ├── public/
-        │   └── index.html
-        └── src/
-            ├── App.css
-            ├── App.jsx
-            ├── index.css
-            ├── index.js
-            ├── main.jsx
-            ├── assets/
-            ├── components/
-            │   ├── AgentForm.jsx
-            │   ├── AgentSelector.jsx
-            │   ├── Analysis.jsx
-            │   ├── CallDetails.jsx
-            │   ├── CallStatus.jsx
-            │   ├── CampaignManager.jsx
-            │   ├── Dashboard.jsx
-            │   ├── EntityAnalysis.jsx
-            │   ├── NewCallForm.jsx
-            │   ├── RecentCalls.jsx
-            │   ├── Settings.jsx
-            │   ├── Sidebar.jsx
-            │   ├── WaveformPlayer.jsx
-            │   └── ui/
-            │       ├── Badge.jsx
-            │       ├── Button.jsx
-            │       ├── Card.jsx
-            │       ├── Input.jsx
-            │       ├── Modal.jsx
-            │       ├── PageLayout.jsx
-            │       ├── Pagination.jsx
-            │       └── Select.jsx
-            └── utils/
-                └── api.js
+ultravoxcalls/
+├── CHANGELOG.md
+├── get_started.md
+├── plivo_get_calls.md
+├── requirements.txt
+├── ultravox_get_calls.md
+├── backend/
+│   ├── agent_controller.py
+│   ├── analysis_controller.py
+│   ├── api_controller.py
+│   ├── calls.db
+│   ├── campaign_controller.py
+│   ├── config.py
+│   ├── database.py
+│   ├── get_started.md
+│   ├── models.py
+│   ├── phone_controller.py
+│   ├── plivo_server.py
+│   ├── requirements.txt
+│   ├── simple_call.py
+│   ├── test.py
+│   └── utils.py
+└── frontend-vite/
+    ├── README.md
+    ├── eslint.config.js
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── postcss.config.js
+    ├── tailwind.config.js
+    ├── vite.config.js
+    ├── public/
+    │   └── index.html
+    └── src/
+        ├── App.css
+        ├── App.jsx
+        ├── index.css
+        ├── index.js
+        ├── main.jsx
+        ├── assets/
+        ├── components/
+        │   ├── AgentForm.jsx
+        │   ├── AgentSelector.jsx
+        │   ├── Analysis.jsx
+        │   ├── CallDetails.jsx
+        │   ├── CallStatus.jsx
+        │   ├── CampaignManager.jsx
+        │   ├── Dashboard.jsx
+        │   ├── EntityAnalysis.jsx
+        │   ├── NewCallForm.jsx
+        │   ├── RecentCalls.jsx
+        │   ├── Settings.jsx
+        │   ├── Sidebar.jsx
+        │   ├── WaveformPlayer.jsx
+        │   └── ui/
+        │       ├── Badge.jsx
+        │       ├── Button.jsx
+        │       ├── Card.jsx
+        │       ├── Input.jsx
+        │       ├── Modal.jsx
+        │       ├── PageLayout.jsx
+        │       ├── Pagination.jsx
+        │       └── Select.jsx
+        └── utils/
+            └── api.js
