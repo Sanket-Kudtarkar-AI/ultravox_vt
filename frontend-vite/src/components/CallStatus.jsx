@@ -324,8 +324,8 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                                 <div className="text-sm text-gray-400 mb-1">Initiated At</div>
                                 <div className="font-medium text-white flex items-center">
                                     <Clock size={16} className="mr-2 text-primary-400"/>
-                                    {call.timestamp ? new Date(call.timestamp).toLocaleString() :
-                                        call.details && call.details.initiation_time ? call.details.initiation_time :
+                                    {call.details && call.details.initiation_time ? call.details.initiation_time :
+                                        call.initialTimestamp ? new Date(call.initialTimestamp).toLocaleString() :
                                             'Unknown'}
                                 </div>
                             </div>
@@ -335,7 +335,7 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                     <div>
                         <div
                             className="bg-dark-700/30 p-4 rounded-lg mb-4 border border-dark-600/40 shadow-elegant hover:shadow-lg transition-shadow">
-                            <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center justify-between mb-4">
                                 <div className="text-sm text-gray-400">Call Status</div>
                                 <Badge
                                     variant={statusDisplay.variant}

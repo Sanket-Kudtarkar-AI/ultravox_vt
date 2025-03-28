@@ -77,22 +77,22 @@ function App() {
 
     // useEffect to fetch recent calls
     useEffect(() => {
-  const fetchRecentCalls = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/recent_calls?limit=5');
-      const data = await response.json();
-      if (data.status === 'success') {
-        setRecentCalls(data.calls);
-      } else {
-        console.error('Error fetching recent calls:', data.message);
-      }
-    } catch (error) {
-      console.error('Error fetching recent calls:', error);
-    }
-  };
+        const fetchRecentCalls = async () => {
+            try {
+                const response = await fetch('http://localhost:5000/api/recent_calls?limit=5');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    setRecentCalls(data.calls);
+                } else {
+                    console.error('Error fetching recent calls:', data.message);
+                }
+            } catch (error) {
+                console.error('Error fetching recent calls:', error);
+            }
+        };
 
-  fetchRecentCalls();
-}, []);
+        fetchRecentCalls();
+    }, []);
 
     // Add useEffect to monitor isCreatingAgent changes for debugging
     useEffect(() => {
@@ -539,8 +539,12 @@ function App() {
                     system_prompt: callData.system_prompt
                 };
 
-                // Set the active call and switch to the call status view
-                setActiveCall(activeCallData);
+                // Set the active call with initialTimestamp and switch to the call status view
+                const activeCallDataWithInitialTime = {
+                    ...activeCallData,
+                    initialTimestamp: new Date().toISOString()  // Store the initial time once
+                };
+                setActiveCall(activeCallDataWithInitialTime);
                 setCurrentView('call-status');
             } else {
                 console.error('Error making call:', data.message);
