@@ -189,7 +189,6 @@ const AgentForm = ({
 
         // Prepare the data for the API
         const agentData = {
-            agent_id: formData.id || undefined, // Include ID only if it exists
             name: formData.name,
             system_prompt: formData.system_prompt,
             initial_messages: filteredInitialMessages.length > 0 ? filteredInitialMessages : [''],
@@ -202,6 +201,11 @@ const AgentForm = ({
                 inactivity_messages: formData.settings.inactivity_messages
             }
         };
+
+        // If we're editing (have an ID), add it to the data
+        if (formData.id) {
+            agentData.agent_id = formData.id;
+        }
 
         onSave(agentData);
     };

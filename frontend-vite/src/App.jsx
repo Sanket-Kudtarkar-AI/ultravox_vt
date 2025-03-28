@@ -297,9 +297,12 @@ function App() {
         try {
             let response;
 
-            if (agentData.id) {
-                // If the agent has an ID, it's an update
-                response = await updateAgent(agentData.id, agentData);
+            if (agentData.agent_id) {
+                // If the agent has an agent_id, it's an update
+                const agentId = agentData.agent_id;
+                // Remove agent_id from the payload to avoid duplicates
+                const {agent_id, ...agentDataToSend} = agentData;
+                response = await updateAgent(agentId, agentDataToSend);
             } else {
                 // Otherwise it's a new agent
                 response = await createAgent(agentData);
@@ -319,7 +322,7 @@ function App() {
                     setAgents(sortedAgents);
 
                     // If it was a new agent, select it
-                    if (!agentData.id && response.agent) {
+                    if (!agentData.agent_id && response.agent) {
                         setSelectedAgentId(response.agent.agent_id);
                     }
                 }
