@@ -6,6 +6,52 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2025-03-28
+
+### Added
+- Comprehensive Campaign Manager implementation with modern user interface
+- Four-step campaign creation wizard with intuitive flow:
+  - Step 1: Campaign Setup - Basic information and file upload
+  - Step 2: Contact List Configuration - Column mapping and contact validation
+  - Step 3: Schedule - Campaign timing configuration
+  - Step 4: Review - Final campaign verification before launch
+- Automatic phone number validation and correction for campaign contacts
+- Interactive step indicators that function as navigation controls for completed steps
+- Intelligent contact validation with visual feedback for corrected numbers
+- Advanced UI components for campaign management:
+  - CampaignCard for campaign overview display
+  - CampaignCreationWizard for multi-step campaign setup
+  - CampaignMonitoring for real-time campaign tracking
+  - CampaignResults for comprehensive campaign analysis
+- Estimated campaign duration calculation based on selected contacts
+
+### Changed
+- Reorganized campaign creation process into 4 distinct steps instead of 3
+- Enhanced visual design throughout the Campaign Manager interface
+- Optimized space usage in form layouts for better visual appeal
+- Improved form validation with clear error messages
+- Redesigned badges and status indicators to avoid rendering issues
+- Enhanced column mapping interface with better visual cues for selected columns
+- Upgraded table styling with sticky headers and improved visual hierarchy
+- Improved layout of file upload areas and contact lists
+- Enhanced styling of date and time inputs for scheduling
+
+### Fixed
+- File removal error in Campaign Creation Wizard
+- Badge rendering issues in campaign interface
+- Step indicator styling and positioning
+- Space optimization in Campaign Setup form
+- Form validation issues in multi-step process
+- Invalid contacts display logic
+
+### Technical
+- All campaign components use functional React approach with hooks
+- Implemented component composition for better code organization
+- Used proper conditional rendering based on component state
+- Added transition effects for smoother user experience
+- Used CSS grid for responsive layouts
+- Implemented proper data validation with helpful user feedback
+
 ## [1.10.1] - 2025-03-28
 
 ### Added

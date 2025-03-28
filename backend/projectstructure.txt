@@ -44,7 +44,11 @@ ultravoxcalls/
         │   ├── Analysis.jsx
         │   ├── CallDetails.jsx
         │   ├── CallStatus.jsx
-        │   ├── CampaignManager.jsx
+        │   ├── CampaignCard.jsx         # New component for individual campaign display
+        │   ├── CampaignCreationWizard.jsx # New component for campaign setup process
+        │   ├── CampaignManager.jsx       # Main campaign management component
+        │   ├── CampaignMonitoring.jsx    # New component for real-time campaign tracking
+        │   ├── CampaignResults.jsx       # New component for campaign analytics and reporting
         │   ├── Dashboard.jsx
         │   ├── EntityAnalysis.jsx
         │   ├── NewCallForm.jsx
