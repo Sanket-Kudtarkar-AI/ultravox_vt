@@ -7,15 +7,16 @@ ultravoxcalls/
 ├── backend/
 │   ├── agent_controller.py
 │   ├── analysis_controller.py
-│   ├── api_controller.py
+│   ├── api_controller.py             # Updated with call status API enhancements
 │   ├── calls.db
-│   ├── campaign_controller.py
+│   ├── campaign_controller.py        # Updated with campaign execution endpoints
+│   ├── campaign_executor.py          # NEW file for campaign execution service
 │   ├── config.py
 │   ├── database.py
 │   ├── get_started.md
 │   ├── models.py
 │   ├── phone_controller.py
-│   ├── plivo_server.py
+│   ├── plivo_server.py               # Updated with campaign executor integration
 │   ├── requirements.txt
 │   ├── simple_call.py
 │   ├── test.py
@@ -33,7 +34,7 @@ ultravoxcalls/
     │   └── index.html
     └── src/
         ├── App.css
-        ├── App.jsx
+        ├── App.jsx                        # Updated to connect to campaign executor
         ├── index.css
         ├── index.js
         ├── main.jsx
@@ -44,11 +45,10 @@ ultravoxcalls/
         │   ├── Analysis.jsx
         │   ├── CallDetails.jsx
         │   ├── CallStatus.jsx
-        │   ├── CampaignCard.jsx         # New component for individual campaign display
-        │   ├── CampaignCreationWizard.jsx # New component for campaign setup process
-        │   ├── CampaignManager.jsx       # Main campaign management component
-        │   ├── CampaignMonitoring.jsx    # New component for real-time campaign tracking
-        │   ├── CampaignResults.jsx       # New component for campaign analytics and reporting
+        │   ├── CampaignCard.jsx           # Updated with status display improvements
+        │   ├── CampaignCreationWizard.jsx
+        │   ├── CampaignManager.jsx         # Updated to remove monitor view
+        │   ├── CampaignResults.jsx         # Updated with optimized dynamic refreshing
         │   ├── Dashboard.jsx
         │   ├── EntityAnalysis.jsx
         │   ├── NewCallForm.jsx

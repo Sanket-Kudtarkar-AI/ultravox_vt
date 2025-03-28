@@ -48,6 +48,10 @@ const CampaignCreationWizard = ({
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleNow, setScheduleNow] = useState(true);
 
+  // Editing state
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+
   // Initialize form values on component mount
   useEffect(() => {
     // Set default values for new campaign or use existing values for editing
@@ -67,6 +71,14 @@ const CampaignCreationWizard = ({
 
         setScheduleNow(false);
       }
+
+      // Since we're editing, also set the file name
+      if (campaign.file_name) {
+        setFileName(campaign.file_name);
+      }
+
+      // Fetch existing contacts when editing
+      fetchCampaignContacts(campaign.campaign_id);
     } else {
       // New campaign - set smart defaults
 
@@ -91,6 +103,82 @@ const CampaignCreationWizard = ({
       setScheduleTime(`${defaultHours}:${defaultMinutes}`);
     }
   }, [campaign, agents, savedFromNumbers]);
+
+  // Function to fetch campaign contacts when editing
+  const fetchCampaignContacts = async (campaignId) => {
+    if (!campaignId) return;
+
+    setIsLoadingContacts(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/contacts`);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching campaign contacts: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success' && data.contacts && data.contacts.length > 0) {
+        // Create a synthetic file data structure from the contacts
+        const contactsData = data.contacts.map(contact => {
+          // Convert contact's additional_data from string to object if needed
+          let additionalData = {};
+          if (contact.additional_data) {
+            try {
+              additionalData = typeof contact.additional_data === 'string'
+                ? JSON.parse(contact.additional_data)
+                : contact.additional_data;
+            } catch (e) {
+              console.error('Error parsing additional_data:', e);
+            }
+          }
+
+          // Create a data object that includes name and phone plus any additional data
+          return {
+            name: contact.name || '',
+            phone: contact.phone || '',
+            ...additionalData
+          };
+        });
+
+        // Extract headers from the first contact
+        const sampleContact = contactsData[0];
+        const extractedHeaders = Object.keys(sampleContact);
+
+        // Set the file data and headers
+        setFileData(contactsData);
+        setHeaders(extractedHeaders);
+
+        // Try to find phone and name columns
+        let phoneColIndex = extractedHeaders.findIndex(h =>
+          h.toLowerCase() === 'phone' || h.toLowerCase().includes('phone')
+        );
+
+        let nameColIndex = extractedHeaders.findIndex(h =>
+          h.toLowerCase() === 'name' || h.toLowerCase().includes('name')
+        );
+
+        // Set column indices
+        setPhoneColumnIndex(phoneColIndex !== -1 ? phoneColIndex : 0);
+        setNameColumnIndex(nameColIndex !== -1 ? nameColIndex : 1);
+
+        // Now validate contacts based on the detected columns
+        validateContacts(
+          contactsData,
+          extractedHeaders[phoneColIndex !== -1 ? phoneColIndex : 0],
+          extractedHeaders[nameColIndex !== -1 ? nameColIndex : 1]
+        );
+
+        setContactsLoaded(true);
+      }
+    } catch (error) {
+      console.error('Error fetching campaign contacts:', error);
+      setError('Error loading campaign contacts. ' + error.message);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
 
   // Handle file upload
   const handleFileUpload = (event) => {
@@ -429,7 +517,7 @@ const CampaignCreationWizard = ({
         return;
       }
 
-      if (!file && !campaign) {
+      if (!file && !campaign && !contactsLoaded) {
         setError('Please upload a contact list');
         return;
       }
@@ -569,18 +657,18 @@ const CampaignCreationWizard = ({
 
         <div
           className={`mt-1 border-2 border-dashed rounded-lg ${
-            file 
+            file || contactsLoaded
               ? 'border-primary-600/50 bg-primary-900/10' 
               : 'border-dark-600 hover:border-dark-500'
           } transition-colors`}
         >
           <div className="p-6 text-center">
-            {loading ? (
+            {loading || isLoadingContacts ? (
               <div className="flex flex-col items-center">
                 <RefreshCw size={24} className="text-primary-400 animate-spin mb-2" />
                 <p className="text-gray-400">Processing file...</p>
               </div>
-            ) : file ? (
+            ) : file || (fileName && contactsLoaded) ? (
               <div className="flex flex-col items-center">
                 <FileText size={24} className="text-primary-400 mb-2" />
                 <p className="text-white font-medium mb-1">{fileName}</p>
@@ -595,7 +683,8 @@ const CampaignCreationWizard = ({
                     setHeaders([]);
                     setValidContacts([]);
                     setInvalidContacts([]);
-                    fileInputRef.current.value = '';
+                    setContactsLoaded(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                   className="mt-2 px-3 py-1 bg-dark-700 hover:bg-dark-600 text-white text-sm rounded-md inline-flex items-center"
                 >
@@ -783,7 +872,12 @@ const CampaignCreationWizard = ({
           </div>
         </div>
 
-        {validContacts.length > 0 ? (
+        {isLoadingContacts ? (
+          <div className="flex flex-col items-center py-10">
+            <RefreshCw size={32} className="text-primary-400 animate-spin mb-4" />
+            <p className="text-gray-400">Loading contacts...</p>
+          </div>
+        ) : validContacts.length > 0 ? (
           <>
             <div className="bg-dark-800/50 rounded-lg border border-dark-600 overflow-hidden shadow-inner">
               <table className="min-w-full">
@@ -1349,7 +1443,7 @@ const CampaignCreationWizard = ({
             variant="primary"
             size="md"
             icon={<ArrowRight size={16} />}
-            disabled={loading}
+            disabled={loading || isLoadingContacts}
           >
             Continue
           </Button>
@@ -1359,7 +1453,7 @@ const CampaignCreationWizard = ({
             variant="primary"
             size="md"
             icon={campaign ? <Save size={16} /> : <Play size={16} />}
-            disabled={loading}
+            disabled={loading || isLoadingContacts}
           >
             {loading ? (
               <>

@@ -14,7 +14,6 @@ import Papa from 'papaparse';
 import CampaignCard from './CampaignCard';
 import CampaignCreationWizard from './CampaignCreationWizard';
 import CampaignResults from './CampaignResults';
-import CampaignMonitoring from './CampaignMonitoring';
 
 const CampaignManager = ({
   agents,
@@ -24,7 +23,7 @@ const CampaignManager = ({
   API_BASE_URL
 }) => {
   // Main view states
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'create', 'monitor', 'results'
+  const [currentView, setCurrentView] = useState('list'); // 'list', 'create', 'results'
   const [isLoading, setIsLoading] = useState(true);
   const [campaigns, setCampaigns] = useState([]);
   const [error, setError] = useState(null);
@@ -133,12 +132,6 @@ const CampaignManager = ({
     setCurrentView('results');
   };
 
-  // Function to handle monitoring a campaign
-  const handleMonitorCampaign = (campaign) => {
-    setSelectedCampaign(campaign);
-    setCurrentView('monitor');
-  };
-
   // Function to handle campaign status updates (pause/resume/stop)
   const handleUpdateCampaignStatus = async (campaignId, newStatus) => {
     try {
@@ -233,17 +226,6 @@ const CampaignManager = ({
             onBack={() => setCurrentView('list')}
             onCampaignCreated={handleCampaignCreated}
             campaign={selectedCampaign} // Pass if editing
-          />
-        );
-
-      case 'monitor':
-        return (
-          <CampaignMonitoring
-            campaign={selectedCampaign}
-            API_BASE_URL={API_BASE_URL}
-            onBack={() => setCurrentView('list')}
-            onUpdateStatus={handleUpdateCampaignStatus}
-            onViewResults={handleViewResults}
           />
         );
 
@@ -412,7 +394,6 @@ const CampaignManager = ({
                     onDuplicate={() => handleDuplicateCampaign(campaign.campaign_id)}
                     onDelete={() => handleDeleteCampaign(campaign.campaign_id)}
                     onViewResults={() => handleViewResults(campaign)}
-                    onMonitor={() => handleMonitorCampaign(campaign)}
                     onUpdateStatus={(status) => handleUpdateCampaignStatus(campaign.campaign_id, status)}
                   />
                 ))}

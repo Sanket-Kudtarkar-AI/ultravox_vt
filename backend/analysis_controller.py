@@ -19,58 +19,6 @@ logger = setup_logging("analysis_controller", "analysis_controller.log")
 analysis = Blueprint('analysis', __name__)
 
 
-@analysis.route('/proxy_audio/<path:url>', methods=['GET'])
-def proxy_audio(url):
-    """
-    Proxy endpoint to avoid CORS issues with audio files
-    """
-    try:
-        logger.info(f"Proxying audio from URL: {url}")
-
-        # Decode the URL if it's URL-encoded
-        import urllib.parse
-        decoded_url = urllib.parse.unquote(url)
-        print(f"Decoded url:\n{decoded_url}")
-        # Fetch the audio file
-        response = requests.get(decoded_url, stream=True)
-
-        if not response.ok:
-            logger.error(f"Error fetching audio: {response.status_code} - {response.reason}")
-            return jsonify({
-                "status": "error",
-                "message": f"Failed to fetch audio: {response.status_code} - {response.reason}"
-            }), response.status_code
-
-        # Set appropriate headers for audio streaming
-        headers = {
-            'Content-Type': response.headers.get('Content-Type', 'audio/wav'),
-            'Content-Length': response.headers.get('Content-Length'),
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'public, max-age=3600',
-            'Access-Control-Allow-Origin': '*'  # Allow cross-origin access
-        }
-
-        # Log success
-        logger.info(
-            f"Successfully proxying audio, content-type: {headers['Content-Type']}, size: {headers.get('Content-Length', 'unknown')}")
-
-        # Stream the response
-        return Response(
-            response.iter_content(chunk_size=1024),
-            headers=headers,
-            status=200
-        )
-
-    except Exception as e:
-        logger.error(f"Error proxying audio: {str(e)}")
-        logger.error(traceback.format_exc())
-
-        # Return a more detailed error for debugging
-        return jsonify({
-            "status": "error",
-            "message": f"Server error: {str(e)}",
-            "details": traceback.format_exc()
-        }), 500
 
 
 @analysis.route('/call_transcription/<call_id>', methods=['GET'])
@@ -153,20 +101,127 @@ def get_call_transcription(call_id):
             pass
 
 
+@analysis.route('/proxy_audio/<path:url>', methods=['GET'])
+def proxy_audio(url):
+    """
+    Proxy endpoint to avoid CORS issues with audio files
+    Enhanced to better handle complex URLs with special characters and expired tokens
+    """
+    try:
+        logger.info(f"Proxying audio from URL: {url}")
+
+        # Decode the URL if it's URL-encoded
+        import urllib.parse
+        decoded_url = urllib.parse.unquote(url)
+
+        # Log the decoded URL for debugging (truncate to avoid excessive logging)
+        decoded_url_short = decoded_url
+        if len(decoded_url) > 200:
+            decoded_url_short = decoded_url[:100] + "..." + decoded_url[-100:]
+        logger.info(f"Decoded url: {decoded_url_short}")
+
+        # Remove any line breaks or extra whitespace
+        decoded_url = decoded_url.strip()
+
+        # Set up request parameters with timeout and streaming
+        request_params = {
+            'stream': True,  # Enable streaming for large files
+            'timeout': 10,  # 10-second timeout to prevent hanging
+            'allow_redirects': True  # Follow redirects if needed
+        }
+
+        try:
+            # Fetch the audio file with robust error handling
+            response = requests.get(decoded_url, **request_params)
+
+            if not response.ok:
+                logger.error(f"Error fetching audio: {response.status_code} - {response.reason}")
+                error_message = f"Failed to fetch audio: {response.status_code} - {response.reason}"
+
+                # Special handling for common problems with Google Cloud Storage URLs
+                needs_refresh = False
+                if response.status_code in [400, 401, 403, 404]:
+                    # These status codes commonly indicate expired tokens or invalid permissions
+                    needs_refresh = True
+                    error_message += " (URL may be expired)"
+                    logger.info("URL might be expired or invalid - client should refresh")
+
+                return jsonify({
+                    "status": "error",
+                    "message": error_message,
+                    "needsRefresh": needs_refresh
+                }), response.status_code
+
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout when fetching audio")
+            return jsonify({
+                "status": "error",
+                "message": "Request timed out. The audio file may be too large or the server is unresponsive.",
+                "needsRefresh": True
+            }), 504  # Gateway Timeout
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request exception when fetching audio: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": f"Network error: {str(e)}",
+                "needsRefresh": True
+            }), 500
+
+        # Set appropriate headers for audio streaming
+        # Including the Content-Disposition header to help with downloads
+        headers = {
+            'Content-Type': response.headers.get('Content-Type', 'audio/wav'),
+            'Content-Length': response.headers.get('Content-Length'),
+            'Content-Disposition': 'inline; filename="recording.wav"',
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=3600',
+            'Access-Control-Allow-Origin': '*'  # Allow cross-origin access
+        }
+
+        # Log success with content type and size
+        logger.info(
+            f"Successfully proxying audio, content-type: {headers.get('Content-Type')}, size: {headers.get('Content-Length', 'unknown')}")
+
+        # Stream the response (using chunked transfer with reasonable chunk size)
+        return Response(
+            response.iter_content(chunk_size=8192),  # Larger chunk size for better performance
+            headers=headers,
+            status=200
+        )
+
+    except Exception as e:
+        logger.error(f"Error proxying audio: {str(e)}")
+        logger.error(traceback.format_exc())
+
+        return jsonify({
+            "status": "error",
+            "message": f"Server error: {str(e)}",
+            "details": traceback.format_exc(),
+            "needsRefresh": True
+        }), 500
+
+
 @analysis.route('/call_recording/<call_id>', methods=['GET'])
 def get_call_recording(call_id):
     """
     Fetch call recording URL from Ultravox API and store in database
+    Enhanced to support forced refresh of potentially expired URLs
     """
     try:
         logger.info(f"Fetching recording URL for call ID: {call_id}")
+
+        # Check if we need to force refresh (ignore cache)
+        force_refresh = request.args.get('refresh', 'false').lower() in ['true', '1', 'yes', 't']
+        if force_refresh:
+            logger.info(f"Forced refresh requested for call ID: {call_id}")
 
         # First check if we have this recording URL cached in the database
         db_session = get_db_session_with_retry()
         call_log = db_session.query(CallLog).filter_by(ultravox_id=call_id).first()
 
         # If we have the recording URL cached and it's not requested to refresh
-        if call_log and call_log.recording_url and not request.args.get('refresh'):
+        if call_log and call_log.recording_url and not force_refresh:
             logger.info(f"Using cached recording URL for call ID: {call_id}")
 
             return jsonify({
@@ -185,6 +240,7 @@ def get_call_recording(call_id):
         }
 
         # Make the request to Ultravox API
+        logger.info(f"Requesting fresh recording URL from VT API for call ID: {call_id}")
         response = requests.get(api_url, headers=headers)
 
         # Check if the request was successful - recording returns a 302 redirect
@@ -192,16 +248,27 @@ def get_call_recording(call_id):
             # Get the redirect URL
             recording_url = response.url if response.status_code == 200 else response.headers.get('Location')
 
+            # Verify the URL looks valid
+            if not recording_url or not recording_url.startswith('http'):
+                logger.error(f"Invalid recording URL returned: {recording_url}")
+                return jsonify({
+                    "status": "error",
+                    "message": "Invalid recording URL returned from API"
+                }), 500
+
+            logger.info(f"Received fresh recording URL for call ID: {call_id}")
+
             # Cache the recording URL in the database if we have a call_log record
             if call_log:
                 call_log.recording_url = recording_url
                 db_session.commit()
-                logger.info(f"Cached recording URL for call ID: {call_id}")
+                logger.info(f"Cached new recording URL for call ID: {call_id}")
 
             return jsonify({
                 "status": "success",
                 "url": recording_url,
-                "source": "api"
+                "source": "api",
+                "refreshed": force_refresh
             })
         else:
             error_msg = f"Error from Ultravox API: {response.status_code} - {response.text}"
@@ -223,7 +290,6 @@ def get_call_recording(call_id):
             close_db_session(db_session)
         except:
             pass
-
 
 @analysis.route('/call_analytics/<call_id>/<call_uuid>', methods=['GET'])
 def get_call_analytics(call_id, call_uuid):

@@ -1,10 +1,11 @@
 import json
 import logging
+import requests
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func
 from models import Campaign, Agent, CampaignContact, CallLog
 from database import get_db_session, close_db_session, get_db_session_with_retry
-from config import setup_logging
+from config import setup_logging, ULTRAVOX_API_BASE_URL, ULTRAVOX_API_KEY
 from datetime import datetime
 
 # Set up logging
@@ -23,9 +24,66 @@ def get_campaigns():
         db_session = get_db_session_with_retry()
         campaigns = db_session.query(Campaign).all()
 
+        # Get some additional stats for each campaign
+        campaign_list = []
+        for camp in campaigns:
+            camp_dict = camp.to_dict()
+
+            # Get basic statistics
+            total_contacts = db_session.query(func.count(CampaignContact.id)).filter_by(
+                campaign_id=camp.campaign_id).scalar()
+            completed_contacts = db_session.query(func.count(CampaignContact.id)).filter_by(
+                campaign_id=camp.campaign_id,
+                status='completed'
+            ).scalar()
+            failed_contacts = db_session.query(func.count(CampaignContact.id)).filter_by(
+                campaign_id=camp.campaign_id,
+                status='failed'
+            ).scalar()
+
+            # Add statistics to the campaign data
+            completion_percentage = round((completed_contacts / total_contacts) * 100, 2) if total_contacts > 0 else 0
+            success_rate = round((completed_contacts / (completed_contacts + failed_contacts)) * 100, 2) if (
+                                                                                                                        completed_contacts + failed_contacts) > 0 else 0
+
+            # Calculate analysis progress if the campaign is completed
+            analysis_progress = 0
+            if camp.status == 'completed' and completed_contacts > 0:
+                # Get all completed calls for this campaign
+                completed_call_uuids = db_session.query(CampaignContact.call_uuid).filter_by(
+                    campaign_id=camp.campaign_id,
+                    status='completed'
+                ).all()
+
+                completed_call_uuids = [cu[0] for cu in completed_call_uuids if cu[0]]
+
+                if completed_call_uuids:
+                    # Get call logs with complete analysis
+                    calls_with_analysis = db_session.query(func.count(CallLog.id)).filter(
+                        CallLog.call_uuid.in_(completed_call_uuids),
+                        CallLog.summary.isnot(None),  # Has summary
+                        CallLog.recording_url.isnot(None),  # Has recording
+                        CallLog.transcription.isnot(None)  # Has transcription
+                    ).scalar()
+
+                    # Calculate percentage
+                    analysis_progress = round((calls_with_analysis / len(completed_call_uuids)) * 100) if len(
+                        completed_call_uuids) > 0 else 0
+
+            camp_dict['statistics'] = {
+                'total_contacts': total_contacts,
+                'completed_contacts': completed_contacts,
+                'failed_contacts': failed_contacts,
+                'completion_percentage': completion_percentage,
+                'success_rate': success_rate,
+                'analysis_progress': analysis_progress
+            }
+
+            campaign_list.append(camp_dict)
+
         return jsonify({
             "status": "success",
-            "campaigns": [campaign.to_dict() for campaign in campaigns]
+            "campaigns": campaign_list
         })
     except Exception as e:
         logger.error(f"Error in get_campaigns: {str(e)}")
@@ -67,13 +125,40 @@ def get_campaign(campaign_id):
             status='pending'
         ).scalar()
 
+        # Calculate analysis progress
+        analysis_progress = 0
+        if campaign.status == 'completed' and completed_contacts > 0:
+            # Get all completed calls for this campaign
+            completed_call_uuids = db_session.query(CampaignContact.call_uuid).filter_by(
+                campaign_id=campaign_id,
+                status='completed'
+            ).all()
+
+            completed_call_uuids = [cu[0] for cu in completed_call_uuids if cu[0]]
+
+            if completed_call_uuids:
+                # Get call logs with complete analysis
+                calls_with_analysis = db_session.query(func.count(CallLog.id)).filter(
+                    CallLog.call_uuid.in_(completed_call_uuids),
+                    CallLog.summary.isnot(None),  # Has summary
+                    CallLog.recording_url.isnot(None),  # Has recording
+                    CallLog.transcription.isnot(None)  # Has transcription
+                ).scalar()
+
+                # Calculate percentage
+                analysis_progress = round((calls_with_analysis / len(completed_call_uuids)) * 100) if len(
+                    completed_call_uuids) > 0 else 0
+
         campaign_data = campaign.to_dict()
         campaign_data['statistics'] = {
             'total_contacts': total_contacts,
             'completed_contacts': completed_contacts,
             'failed_contacts': failed_contacts,
             'pending_contacts': pending_contacts,
-            'completion_percentage': round((completed_contacts / total_contacts) * 100, 2) if total_contacts > 0 else 0
+            'completion_percentage': round((completed_contacts / total_contacts) * 100, 2) if total_contacts > 0 else 0,
+            'success_rate': round((completed_contacts / (completed_contacts + failed_contacts)) * 100, 2) if (
+                                                                                                                         completed_contacts + failed_contacts) > 0 else 0,
+            'analysis_progress': analysis_progress
         }
 
         return jsonify({
@@ -552,118 +637,6 @@ def delete_campaign_contact(campaign_id, contact_id):
         close_db_session(db_session)
 
 
-@campaign.route('/campaigns/<int:campaign_id>/schedule', methods=['POST'])
-def schedule_campaign(campaign_id):
-    """
-    Schedule a campaign to run at a specific time
-    """
-    try:
-        data = request.json
-
-        if "schedule_date" not in data:
-            return jsonify({
-                "status": "error",
-                "message": "Missing required field: schedule_date"
-            }), 400
-
-        db_session = get_db_session_with_retry()
-
-        # Check if campaign exists
-        campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
-        if not campaign:
-            return jsonify({
-                "status": "error",
-                "message": f"Campaign with ID {campaign_id} not found"
-            }), 404
-
-        # Parse the schedule date
-        try:
-            schedule_date = datetime.fromisoformat(data["schedule_date"])
-        except ValueError:
-            return jsonify({
-                "status": "error",
-                "message": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)"
-            }), 400
-
-        # Update the campaign
-        campaign.schedule_date = schedule_date
-        campaign.status = "scheduled"
-        campaign.updated_at = datetime.now()
-        db_session.commit()
-
-        logger.info(f"Scheduled campaign {campaign_id} for {schedule_date}")
-
-        return jsonify({
-            "status": "success",
-            "message": "Campaign scheduled successfully",
-            "campaign": campaign.to_dict()
-        })
-
-    except Exception as e:
-        logger.error(f"Error in schedule_campaign: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-    finally:
-        close_db_session(db_session)
-
-
-@campaign.route('/campaigns/<int:campaign_id>/next-contact', methods=['GET'])
-def get_next_campaign_contact(campaign_id):
-    """
-    Get the next pending contact for a campaign
-    """
-    try:
-        db_session = get_db_session_with_retry()
-
-        # Check if campaign exists
-        campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
-        if not campaign:
-            return jsonify({
-                "status": "error",
-                "message": f"Campaign with ID {campaign_id} not found"
-            }), 404
-
-        # Ensure campaign is running
-        if campaign.status != "running":
-            return jsonify({
-                "status": "error",
-                "message": f"Campaign is not running (current status: {campaign.status})"
-            }), 400
-
-        # Get next pending contact
-        next_contact = db_session.query(CampaignContact).filter_by(
-            campaign_id=campaign_id,
-            status="pending"
-        ).order_by(CampaignContact.id).first()
-
-        if not next_contact:
-            # No more pending contacts, mark campaign as completed
-            campaign.status = "completed"
-            db_session.commit()
-
-            return jsonify({
-                "status": "success",
-                "message": "No more pending contacts, campaign marked as completed",
-                "contact": None
-            })
-
-        return jsonify({
-            "status": "success",
-            "contact": next_contact.to_dict()
-        })
-
-    except Exception as e:
-        logger.error(f"Error in get_next_campaign_contact: {str(e)}")
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
-    finally:
-        close_db_session(db_session)
-
-
 @campaign.route('/campaigns/<int:campaign_id>/stats', methods=['GET'])
 def get_campaign_stats(campaign_id):
     """
@@ -722,6 +695,30 @@ def get_campaign_stats(campaign_id):
             success_rate = round(
                 (completed_contacts / (completed_contacts + failed_contacts + no_answer_contacts)) * 100, 2)
 
+        # Calculate analysis progress
+        analysis_progress = 0
+        if campaign.status == 'completed' and completed_contacts > 0:
+            # Get all completed calls for this campaign
+            completed_call_uuids = db_session.query(CampaignContact.call_uuid).filter_by(
+                campaign_id=campaign_id,
+                status='completed'
+            ).all()
+
+            completed_call_uuids = [cu[0] for cu in completed_call_uuids if cu[0]]
+
+            if completed_call_uuids:
+                # Get call logs with complete analysis
+                calls_with_analysis = db_session.query(func.count(CallLog.id)).filter(
+                    CallLog.call_uuid.in_(completed_call_uuids),
+                    CallLog.summary.isnot(None),  # Has summary
+                    CallLog.recording_url.isnot(None),  # Has recording
+                    CallLog.transcription.isnot(None)  # Has transcription
+                ).scalar()
+
+                # Calculate percentage
+                analysis_progress = round((calls_with_analysis / len(completed_call_uuids)) * 100) if len(
+                    completed_call_uuids) > 0 else 0
+
         # Get associated calls
         calls = db_session.query(CallLog).filter_by(campaign_id=campaign_id).all()
 
@@ -752,6 +749,7 @@ def get_campaign_stats(campaign_id):
             "success_rate": success_rate,
             "total_calls": call_count,
             "average_call_duration": avg_duration,
+            "analysis_progress": analysis_progress,
             "created_at": campaign.created_at.isoformat() if campaign.created_at else None,
             "updated_at": campaign.updated_at.isoformat() if campaign.updated_at else None,
             "schedule_date": campaign.schedule_date.isoformat() if campaign.schedule_date else None
@@ -764,6 +762,86 @@ def get_campaign_stats(campaign_id):
 
     except Exception as e:
         logger.error(f"Error in get_campaign_stats: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        close_db_session(db_session)
+
+
+@campaign.route('/campaigns/<int:campaign_id>/execute', methods=['POST'])
+def execute_campaign(campaign_id):
+    """
+    Manually trigger execution of a campaign
+    """
+    try:
+        db_session = get_db_session_with_retry()
+
+        # Check if campaign exists
+        campaign = db_session.query(Campaign).filter_by(campaign_id=campaign_id).first()
+        if not campaign:
+            return jsonify({
+                "status": "error",
+                "message": f"Campaign with ID {campaign_id} not found"
+            }), 404
+
+        # Import here to avoid circular imports
+        from campaign_executor import process_campaign, start_executor, running
+
+        # Make sure executor is running
+        if not running:
+            start_executor()
+
+        # Process the campaign immediately
+        result = process_campaign(campaign_id)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Campaign {campaign_id} execution triggered",
+            "result": result
+        })
+
+    except Exception as e:
+        logger.error(f"Error executing campaign {campaign_id}: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+    finally:
+        close_db_session(db_session)
+
+
+@campaign.route('/campaigns/executor/status', methods=['GET'])
+def get_executor_status():
+    """
+    Get the current status of the campaign executor
+    """
+    try:
+        # Import here to avoid circular imports
+        from campaign_executor import running
+
+        # Get active campaigns
+        db_session = get_db_session_with_retry()
+        running_campaigns = db_session.query(Campaign).filter_by(status="running").count()
+        scheduled_campaigns = db_session.query(Campaign).filter_by(status="scheduled").count()
+
+        # Get active calls
+        from sqlalchemy import and_
+        from models import CampaignContact
+        active_calls = db_session.query(CampaignContact).filter_by(status="calling").count()
+
+        return jsonify({
+            "status": "success",
+            "executor": {
+                "running": running,
+                "active_campaigns": running_campaigns,
+                "scheduled_campaigns": scheduled_campaigns,
+                "active_calls": active_calls
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting executor status: {str(e)}")
         return jsonify({
             "status": "error",
             "message": str(e)

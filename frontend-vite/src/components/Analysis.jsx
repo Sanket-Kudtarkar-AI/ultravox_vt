@@ -15,7 +15,8 @@ import {
     CheckCircle2,
     XCircle,
     AlertTriangle,
-    Brain
+    Brain,
+    AlertCircle
 } from 'lucide-react';
 import Button from './ui/Button';
 import EntityAnalysis from './EntityAnalysis';
@@ -54,6 +55,10 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
     const [isPlaying, setIsPlaying] = useState(false);
     const [audioTime, setAudioTime] = useState(0);
     const audioRef = useRef(null);
+
+    // Add state for recording retry management
+    const [recordingRetryCount, setRecordingRetryCount] = useState(0);
+    const MAX_RETRIES = 3;
 
     console.log("==================== ANALYSIS COMPONENT DEBUG ====================");
     console.log("Received props - callId:", ultravoxCallId, "callUuid:", callUuid);
@@ -116,7 +121,7 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
     // Fetch call data on component mount
     useEffect(() => {
         if (ultravoxCallId && serverStatus === 'online') {
-            console.log("Fetching data with ultravoxCallId:", ultravoxCallId); // Add debug logging
+            console.log("Fetching data with ultravoxCallId:", ultravoxCallId);
             fetchTranscription();
 
             // Wrap recording fetch in try-catch to prevent it from blocking other functionality
@@ -175,14 +180,24 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
         }
     };
 
-    // Fetch recording URL - return a promise for better control
-    const fetchRecordingUrl = async () => {
+    // Enhanced version of fetchRecordingUrl with retry logic
+    const fetchRecordingUrl = async (retryAttempt = 0) => {
         if (!ultravoxDataAvailable) return Promise.resolve();
 
         try {
-            console.log("ANALYSIS COMPONENT - Fetching recording URL with Ultravox ID:", ultravoxCallId);
+            // Set loading/error state
+            if (retryAttempt === 0) {
+                setRecordingError(null);
+            } else {
+                setRecordingError(`Refreshing recording URL (attempt ${retryAttempt} of ${MAX_RETRIES})...`);
+            }
 
-            const response = await fetch(`${API_BASE_URL}/call_recording/${ultravoxCallId}`);
+            console.log(`ANALYSIS COMPONENT - Fetching recording URL (attempt ${retryAttempt + 1}) with Ultravox ID:`, ultravoxCallId);
+
+            // Add a refresh parameter to force new URL when retrying
+            const refresh = retryAttempt > 0 ? 'true' : 'false';
+            const response = await fetch(`${API_BASE_URL}/call_recording/${ultravoxCallId}?refresh=${refresh}`);
+
             console.log("ANALYSIS COMPONENT - Recording URL response status:", response.status);
 
             if (!response.ok) {
@@ -213,6 +228,7 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
                 console.log("ANALYSIS COMPONENT - Using proxy URL:", proxyUrl);
                 setRecordingUrl(proxyUrl);
                 setRecordingError(null);
+                setRecordingRetryCount(0); // Reset retry count on success
                 return Promise.resolve(true);
             } else {
                 console.warn("ANALYSIS COMPONENT - No URL in recording response:", responseData);
@@ -223,6 +239,29 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
             console.error('ANALYSIS COMPONENT - Error fetching recording URL:', err);
             setRecordingError(err.message || "Failed to fetch recording URL");
             return Promise.reject(err.message || "Failed to fetch recording URL");
+        }
+    };
+
+    // Handle audio playback errors - attempt to refresh URL
+    const handleAudioError = () => {
+        console.log("ANALYSIS COMPONENT - Audio playback error detected");
+
+        if (recordingRetryCount < MAX_RETRIES) {
+            const nextRetryCount = recordingRetryCount + 1;
+            console.log(`ANALYSIS COMPONENT - Will retry with fresh URL (${nextRetryCount} of ${MAX_RETRIES})`);
+
+            setRecordingRetryCount(nextRetryCount);
+            setRecordingError(`Playback failed. Refreshing recording URL (attempt ${nextRetryCount} of ${MAX_RETRIES})...`);
+
+            // Fetch with a fresh URL after a short delay
+            setTimeout(() => {
+                fetchRecordingUrl(nextRetryCount).catch(err => {
+                    console.error("ANALYSIS COMPONENT - Failed to refresh recording URL:", err);
+                    setRecordingError(`Could not refresh recording URL: ${err}. Please try again later.`);
+                });
+            }, 1000);
+        } else {
+            setRecordingError("Maximum retry attempts reached. Please try refreshing manually.");
         }
     };
 
@@ -617,7 +656,7 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
                             </div>
                         )}
 
-                        {/* Recording Tab */}
+                        {/* Recording Tab - Enhanced with better error handling */}
                         {activeTab === 'recording' && (
                             <div>
                                 <div className="mb-6 flex justify-between items-center bg-dark-800/30 p-4 rounded-lg">
@@ -638,20 +677,45 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
                                             {recordingError || "Recordings may take a few minutes to become available after call completion."}
                                         </p>
                                         <Button
-                                            onClick={refreshAllData}
+                                            onClick={() => {
+                                                setRecordingRetryCount(0);
+                                                fetchRecordingUrl(0);
+                                            }}
                                             variant="primary"
                                             className="mt-4"
                                             icon={<RefreshCw size={16}/>}
                                         >
-                                            Refresh Data
+                                            Refresh Recording
                                         </Button>
                                     </div>
                                 ) : (
                                     <div className="bg-dark-800/50 backdrop-blur-sm p-6 rounded-lg">
                                         <div className="mb-6">
                                             <div className="relative">
-                                                {/* Try using WaveformPlayer, but have a fallback */}
                                                 <h4 className="text-white font-medium mb-4">Recording Playback</h4>
+
+                                                {/* Show error message if present */}
+                                                {recordingError && (
+                                                    <div className="p-4 mb-4 bg-red-900/20 border border-red-800/30 rounded-lg flex items-start">
+                                                        <AlertCircle size={20} className="text-red-400 mr-3 mt-0.5 flex-shrink-0" />
+                                                        <div className="flex-1">
+                                                            <p className="text-white mb-2">{recordingError}</p>
+                                                            <Button
+                                                                onClick={() => {
+                                                                    // Reset retry count and fetch fresh URL
+                                                                    setRecordingRetryCount(0);
+                                                                    fetchRecordingUrl(0);
+                                                                }}
+                                                                variant="primary"
+                                                                size="sm"
+                                                                icon={<RefreshCw size={14} />}
+                                                            >
+                                                                Refresh URL
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <div className="p-4 bg-dark-700/30 rounded-lg mb-4">
                                                     <div className="text-center p-3">
                                                         <audio
@@ -660,6 +724,7 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
                                                             className="w-full"
                                                             src={recordingUrl}
                                                             preload="auto"
+                                                            onError={handleAudioError}
                                                         >
                                                             Your browser does not support the audio element.
                                                         </audio>
@@ -672,7 +737,16 @@ const Analysis = ({callId: ultravoxCallId, callUuid, onClose, serverStatus}) => 
                                                             className="text-primary-400 hover:text-primary-300 underline"
                                                         >
                                                             download the recording
-                                                        </a> directly.
+                                                        </a> directly, or
+                                                        <button
+                                                            onClick={() => {
+                                                                setRecordingRetryCount(0);
+                                                                fetchRecordingUrl(0);
+                                                            }}
+                                                            className="text-primary-400 hover:text-primary-300 underline ml-1"
+                                                        >
+                                                            refresh the recording URL
+                                                        </button>.
                                                     </p>
                                                 </div>
                                             </div>

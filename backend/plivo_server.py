@@ -17,6 +17,7 @@ from phone_controller import phone
 from campaign_controller import campaign
 from database import init_db, get_db_session, close_db_session, get_db_session_with_retry
 from models import CallLog, CallMapping, Agent
+import campaign_executor  # Import the campaign executor module
 
 
 # Create a filter to ignore frequent endpoint logs
@@ -367,6 +368,36 @@ def home():
     })
 
 
+# API endpoints for campaign executor control
+@app.route('/api/campaign_executor/start', methods=['POST'])
+def start_campaign_executor():
+    """Start the campaign executor"""
+    result = campaign_executor.start_executor()
+    return jsonify({
+        "status": "success" if result else "error",
+        "message": "Campaign executor started" if result else "Failed to start campaign executor"
+    })
+
+
+@app.route('/api/campaign_executor/stop', methods=['POST'])
+def stop_campaign_executor():
+    """Stop the campaign executor"""
+    result = campaign_executor.stop_executor()
+    return jsonify({
+        "status": "success" if result else "error",
+        "message": "Campaign executor stopped" if result else "Failed to stop campaign executor"
+    })
+
+
+@app.route('/api/campaign_executor/status', methods=['GET'])
+def campaign_executor_status():
+    """Get the campaign executor status"""
+    return jsonify({
+        "status": "success",
+        "running": campaign_executor.running
+    })
+
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     """
@@ -389,5 +420,9 @@ if __name__ == '__main__':
     app.config["CUSTOM_MAX_DURATION"] = None
     app.config["CURRENT_ULTRAVOX_CALL_ID"] = None
     app.config["CURRENT_PLIVO_CALL_UUID"] = None
+
+    # Initialize campaign executor
+    logger.info("Initializing campaign executor")
+    campaign_executor.initialize()
 
     app.run(debug=True, host='0.0.0.0', port=port)

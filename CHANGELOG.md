@@ -6,6 +6,50 @@ All notable changes to the AI Voice Call System will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+# CHANGELOG - Version 1.12.1 (March 28, 2025)
+
+## Campaign Execution Service
+- Implemented background campaign execution service that processes calls automatically
+- Added sequential call processing with 5-second delays between calls
+- Created call status monitoring and synchronization between database tables
+- Integrated automatic campaign status updates when all calls are completed
+- Added executor control endpoints to start/stop/check campaign execution
+
+## Call Status Handling
+- Enhanced status synchronization between call_logs and campaign_contacts tables
+- Fixed issue with calls stuck in "calling" status when already completed/failed
+- Added proper handling for EARLY MEDIA and other special call states
+- Standardized status badge display across the application
+- Improved error handling for call status updates
+
+## UI Improvements
+- Enhanced CampaignResults with non-flickering, dynamic updates
+- Implemented smart refresh strategies that only update changed data
+- Added auto-refresh toggle with minimal visual interruption
+- Improved loading states to maintain UI continuity during updates
+- Added small refresh indicator instead of full-page loading states
+
+## Analysis Tracking
+- Added Analysis Progress tracking and visualization for completed calls
+- Implemented efficient batch processing of analysis availability checks
+- Added retry mechanism for analysis checks (up to 15 seconds)
+- Enhanced status indicators for calls with/without analysis
+- Added direct "View" button for calls with complete analysis
+
+## Technical Improvements
+- Optimized database queries and update operations
+- Added detailed error logging throughout campaign execution process
+- Implemented concurrency management to prevent overwhelming the system
+- Enhanced data comparison to avoid unnecessary UI re-renders
+- Added Promise.all for parallel API requests and database updates
+
+## Other Changes
+- Removed redundant CampaignMonitoring view to simplify workflow
+- Updated API endpoints for better campaign status tracking
+- Enhanced execution status reporting for better monitoring
+- Added utility endpoints for manual campaign ex
+
 ## [1.11.1] - 2025-03-28
 
 ### Added

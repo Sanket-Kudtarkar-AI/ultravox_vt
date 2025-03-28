@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Play, Pause, Square, Edit, Copy, Trash2, BarChart,
   Phone, Calendar, Clock, CheckCircle, XCircle, AlertCircle,
-  User, Eye
+  User, Eye, Activity
 } from 'lucide-react';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -13,7 +13,6 @@ const CampaignCard = ({
   onDuplicate,
   onDelete,
   onViewResults,
-  onMonitor,
   onUpdateStatus
 }) => {
   const [showActions, setShowActions] = useState(false);
@@ -58,6 +57,8 @@ const CampaignCard = ({
     return 0; // Can't calculate without more data
   };
 
+  // Get analysis progress if available
+  const analysisProgress = campaign.statistics?.analysis_progress || 0;
   const progressPercent = calculateProgress();
   const statusBadge = getStatusBadge(campaign.status);
 
@@ -140,6 +141,26 @@ const CampaignCard = ({
           </div>
         </div>
 
+        {/* Analysis Progress - Only show for completed campaigns */}
+        {campaign.status === 'completed' && (
+          <div className="mb-4 mt-3">
+            <div className="flex justify-between text-sm mb-1 items-center">
+              <span className="text-gray-400 flex items-center">
+                <Activity size={12} className="mr-1 text-accent-400" />
+                Analysis Ready
+              </span>
+              <span className="text-white">{analysisProgress}%</span>
+            </div>
+
+            <div className="w-full bg-dark-600 rounded-full h-2.5 mb-1">
+              <div
+                className="bg-gradient-to-r from-accent-600 to-accent-400 h-2.5 rounded-full"
+                style={{ width: `${analysisProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
         {/* Success Rate if available */}
         {campaign.statistics && (
           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -161,32 +182,17 @@ const CampaignCard = ({
 
         {/* Action Buttons */}
         <div className={`flex flex-wrap justify-between transition-opacity duration-200 ${showActions ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="space-x-1">
-            {/* View Results - only show if campaign has started */}
-            {(campaign.status === 'running' || campaign.status === 'paused' || campaign.status === 'completed') && (
-              <Button
-                onClick={onViewResults}
-                variant="secondary"
-                size="sm"
-                icon={<BarChart size={14} />}
-                title="View Results"
-              >
-                Results
-              </Button>
-            )}
-
-            {/* Monitor - only show if campaign is active */}
-            {(campaign.status === 'running' || campaign.status === 'paused') && (
-              <Button
-                onClick={onMonitor}
-                variant="primary"
-                size="sm"
-                icon={<Eye size={14} />}
-                title="Monitor Campaign"
-              >
-                Monitor
-              </Button>
-            )}
+          <div>
+            {/* View Results - show for any campaign status */}
+            <Button
+              onClick={onViewResults}
+              variant="primary"
+              size="sm"
+              icon={<BarChart size={14} />}
+              title="View Campaign Details"
+            >
+              Details
+            </Button>
           </div>
 
           <div className="space-x-1">
