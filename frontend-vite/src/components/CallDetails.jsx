@@ -1,7 +1,13 @@
 import React from 'react';
-import {Phone, Calendar, Clock, User, RefreshCw, BarChart, Info, CheckCircle, XCircle, AlertCircle, ChevronLeft} from 'lucide-react';
+import {Phone, Calendar, Clock, User, RefreshCw, BarChart, Info, ChevronLeft} from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
+import {
+    getStatusDisplay,
+    formatCallDuration,
+    getHangupCauseDescription,
+    getHangupSourceDescription
+} from '../utils/callStatusUtils';
 
 const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) => {
     const formatPropertyValue = (value) => {
@@ -10,16 +16,8 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
         return value;
     };
 
-    // Format the status display
-    const getStatusDisplay = (status) => {
-        if (status === 'ANSWER') return {label: 'Completed', color: 'green', icon: <CheckCircle size={16}/>};
-        if (status === 'BUSY') return {label: 'Busy', color: 'yellow', icon: <AlertCircle size={16}/>};
-        if (status === 'NO_ANSWER') return {label: 'No Answer', color: 'gray', icon: <XCircle size={16}/>};
-        if (status === 'FAILED') return {label: 'Failed', color: 'red', icon: <XCircle size={16}/>};
-        return {label: status, color: 'blue', icon: <Info size={16}/>};
-    };
-
-    const statusDisplay = getStatusDisplay(call.call_state);
+    // Get formatted status display using our utility
+    const statusDisplay = getStatusDisplay(call.call_state, true);
 
     return (
         <Card className="overflow-hidden">
@@ -27,7 +25,7 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
                 className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
                 <div className="flex items-center">
                     <button
-                        onClick={onBack} // Add this prop to CallDetails component
+                        onClick={onBack}
                         className="p-2 -ml-2 mr-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-full transition-colors"
                     >
                         <ChevronLeft size={20}/>
@@ -78,7 +76,7 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
                                 <div>
                                     <div className="text-sm text-gray-400">VT Call ID</div>
                                     <div className="font-medium break-all text-white">
-                                        {call.ultravox_call_id || 'N/A'}
+                                        {call.ultravox_call_id || call.ultravox_id || 'N/A'}
                                     </div>
                                 </div>
                             </div>
@@ -110,7 +108,7 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
                                 <div>
                                     <div className="text-sm text-gray-400">Duration</div>
                                     <div className="font-medium text-white">
-                                        {call.call_duration ? `${call.call_duration} seconds` : 'N/A'}
+                                        {call.call_duration ? formatCallDuration(call.call_duration) : 'N/A'}
                                     </div>
                                 </div>
                             </div>
@@ -127,10 +125,10 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
                     <div className="bg-dark-700/30 p-4 rounded-lg border border-dark-600/50">
                         <div className="flex items-center mb-4">
                             <div
-                                className={`flex items-center justify-center w-8 h-8 rounded-full bg-${statusDisplay.color}-900/30 text-${statusDisplay.color}-400 mr-3`}>
+                                className={`flex items-center justify-center w-8 h-8 rounded-full bg-${statusDisplay.variant}-900/30 text-${statusDisplay.variant}-400 mr-3`}>
                                 {statusDisplay.icon}
                             </div>
-                            <span className="font-medium text-white">{statusDisplay.label}</span>
+                            <span className="font-medium text-white">{statusDisplay.text}</span>
                         </div>
 
                         <div className="space-y-2">
@@ -151,14 +149,18 @@ const CallDetails = ({call, onRefreshStatus, loading, onViewAnalysis, onBack}) =
                             {call.hangup_cause_name && (
                                 <div className="flex justify-between text-sm p-2 bg-dark-800/50 rounded">
                                     <span className="text-gray-400">Hangup Cause:</span>
-                                    <span className="text-white">{call.hangup_cause_name}</span>
+                                    <span className="text-white" title={getHangupCauseDescription(call.hangup_cause_name)}>
+                                        {call.hangup_cause_name}
+                                    </span>
                                 </div>
                             )}
 
                             {call.hangup_source && (
                                 <div className="flex justify-between text-sm p-2 bg-dark-800/50 rounded">
                                     <span className="text-gray-400">Hangup Source:</span>
-                                    <span className="text-white">{call.hangup_source}</span>
+                                    <span className="text-white" title={getHangupSourceDescription(call.hangup_source)}>
+                                        {call.hangup_source}
+                                    </span>
                                 </div>
                             )}
                         </div>

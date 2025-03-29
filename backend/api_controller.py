@@ -50,7 +50,7 @@ def make_call_api():
     """
     try:
         data = request.json
-        logger.info(f"Received call request: {data}")
+        logger.info(f"Received call request: ")
 
         # Validate required fields
         required_fields = ["recipient_phone_number", "plivo_phone_number"]
@@ -415,7 +415,7 @@ def get_call_status(call_uuid):
                     if call_data['initiation_time']:
                         call_log.initiation_time = parse_plivo_datetime(call_data['initiation_time'])
 
-                    call_log.hangup_cause = call_data['hangup_cause_name']
+                    call_log.hangup_cause_name = call_data['hangup_cause_name']
                     call_log.hangup_source = call_data['hangup_source']
 
                     # Store the JSON data for reference
@@ -494,7 +494,7 @@ def get_recent_calls():
                 "initiation_time": call.initiation_time.isoformat() if call.initiation_time else None,
                 "answer_time": call.answer_time.isoformat() if call.answer_time else None,
                 "end_time": call.end_time.isoformat() if call.end_time else None,
-                "hangup_cause": call.hangup_cause,
+                "hangup_cause_name": call.hangup_cause_name,
                 "campaign_id": call.campaign_id,
                 "agent_id": call.agent_id
             }

@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-    RefreshCw, Info, PhoneCall, BarChart, Clock, CheckCircle, XCircle,
-    AlertCircle, Tag, MessageSquare, FileAudio, ChevronLeft
+    RefreshCw, Info, PhoneCall, BarChart, Clock, ChevronLeft, Tag, AlertCircle
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
 import Pagination from './ui/Pagination';
 import { getRecentCalls } from '../utils/api';
+import {
+    getStatusDisplay,
+    formatCallDuration,
+    CALL_STATE
+} from '../utils/callStatusUtils';
 
 const RecentCalls = ({
     onViewDetails,
@@ -50,44 +54,17 @@ const RecentCalls = ({
         }
     };
 
-    // Helper function to format call status
+    // Helper function to format call status using our utility
     const getStatusBadge = (status) => {
-        if (status === 'ANSWER') {
-            return <Badge variant="success" pill>
+        const statusInfo = getStatusDisplay(status, true);
+        return (
+            <Badge variant={statusInfo.variant} pill>
                 <div className="flex items-center">
-                    <CheckCircle size={12} className="mr-1"/>
-                    Completed
+                    {statusInfo.icon}
+                    <span className="ml-1">{statusInfo.text}</span>
                 </div>
-            </Badge>;
-        } else if (status === 'BUSY') {
-            return <Badge variant="warning" pill>
-                <div className="flex items-center">
-                    <AlertCircle size={12} className="mr-1"/>
-                    Busy
-                </div>
-            </Badge>;
-        } else if (status === 'NO_ANSWER') {
-            return <Badge variant="default" pill>
-                <div className="flex items-center">
-                    <XCircle size={12} className="mr-1"/>
-                    No Answer
-                </div>
-            </Badge>;
-        } else if (status === 'FAILED') {
-            return <Badge variant="error" pill>
-                <div className="flex items-center">
-                    <XCircle size={12} className="mr-1"/>
-                    Failed
-                </div>
-            </Badge>;
-        } else {
-            return <Badge variant="info" pill>
-                <div className="flex items-center">
-                    <Info size={12} className="mr-1"/>
-                    {status || 'Unknown'}
-                </div>
-            </Badge>;
-        }
+            </Badge>
+        );
     };
 
     // Helper to format timestamp
@@ -124,7 +101,7 @@ const RecentCalls = ({
                 className="p-6 border-b border-dark-700 flex justify-between items-center bg-dark-800/50 backdrop-blur-sm">
                 <div className="flex items-center">
                     <button
-                        onClick={() => setCurrentView('dashboard')} // You'll need to pass this prop
+                        onClick={() => setCurrentView('dashboard')}
                         className="p-2 -ml-2 mr-2 text-gray-400 hover:text-white hover:bg-dark-700 rounded-full transition-colors"
                     >
                         <ChevronLeft size={20}/>
@@ -215,7 +192,7 @@ const RecentCalls = ({
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-gray-400">
-                                        {call.call_duration ? `${call.call_duration} seconds` : 'N/A'}
+                                        {call.call_duration ? formatCallDuration(call.call_duration) : 'N/A'}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -240,7 +217,7 @@ const RecentCalls = ({
                                             size="sm"
                                             onClick={() => onViewAnalysis(call)}
                                             icon={<BarChart size={14}/>}
-                                            disabled={!call.ultravox_id}
+                                            disabled={!call.ultravox_id && !call.ultravox_call_id}
                                         >
                                             Analysis
                                         </Button>

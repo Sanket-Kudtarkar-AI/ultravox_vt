@@ -226,10 +226,10 @@ def hangup_url():
     call_uuid = request.form.get('CallUUID', 'unknown')
     call_status = request.form.get('CallStatus', 'unknown')
     duration = request.form.get('Duration', 'unknown')
-    hangup_cause = request.form.get('HangupCause', 'unknown')
+    hangup_cause_name = request.form.get('HangupCause', 'unknown')
 
     logger.info(f"Call {call_uuid} ended with status {call_status}")
-    logger.info(f"Call duration: {duration} seconds, Hangup cause: {hangup_cause}")
+    logger.info(f"Call duration: {duration} seconds, Hangup cause: {hangup_cause_name}")
 
     # Get the Ultravox call ID from app context if available
     ultravox_call_id = current_app.config.get("CURRENT_ULTRAVOX_CALL_ID")
@@ -257,7 +257,7 @@ def hangup_url():
             # Update call details
             call_log.call_state = call_status
             call_log.call_duration = int(duration) if duration and duration != 'unknown' else None
-            call_log.hangup_cause = hangup_cause if hangup_cause != 'unknown' else None
+            call_log.hangup_cause_name = hangup_cause_name if hangup_cause_name != 'unknown' else None
             call_log.end_time = datetime.now()
 
             # Store additional data
@@ -287,7 +287,7 @@ def hangup_url():
                 from_number=plivo_number,
                 call_state=call_status,
                 call_duration=int(duration) if duration and duration != 'unknown' else None,
-                hangup_cause=hangup_cause if hangup_cause != 'unknown' else None,
+                hangup_cause_name=hangup_cause_name if hangup_cause_name != 'unknown' else None,
                 initiation_time=datetime.now() - (datetime.now() - datetime.now()),  # Approximate
                 end_time=datetime.now(),
                 plivo_data=json.dumps({

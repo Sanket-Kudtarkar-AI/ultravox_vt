@@ -3,18 +3,21 @@ import {
     Phone,
     RefreshCw,
     Clock,
-    AlertCircle,
-    CheckCircle,
-    PhoneOff,
     Info,
     Shield,
     BarChart,
-    X,
-    XCircle
+    PhoneOff
 } from 'lucide-react';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import {
+    getStatusDisplay,
+    formatCallDuration,
+    getHangupCauseDescription,
+    getHangupSourceDescription,
+    CALL_STATUS
+} from '../utils/callStatusUtils';
 
 const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
     const [autoRefresh, setAutoRefresh] = useState(true);
@@ -28,7 +31,7 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
             interval = setInterval(() => {
                 onRefreshStatus();
                 setLastUpdated(new Date());
-            }, 1000); // Changed to 1 second for real-time updates
+            }, 1000); // 1 second for real-time updates
         }
 
         return () => {
@@ -36,10 +39,10 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
         };
     }, [autoRefresh, call, onRefreshStatus]);
 
-    // Format the status display
-    const getStatusDisplay = () => {
+    // Get formatted status display using our utility
+    const statusDisplay = () => {
         if (!call) return {
-            icon: <AlertCircle/>,
+            icon: <Info size={12} />,
             text: 'Unknown',
             variant: 'default',
             description: 'Call status unknown'
@@ -52,145 +55,19 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                 (call.details && call.details.call_status) ||
                 'unknown';
 
-            switch (status.toLowerCase()) {
-                case 'ringing':
-                    return {
-                        icon: <Phone className="animate-gentle-pulse"/>, // Changed from animate-ping
-                        text: 'Ringing',
-                        variant: 'warning',
-                        description: 'Phone is ringing at recipient'
-                    };
-                case 'in-progress':
-                    return {
-                        icon: <Phone className="animate-pulse"/>,
-                        text: 'In Progress',
-                        variant: 'info',
-                        description: 'Call is currently active'
-                    };
-                case 'busy':
-                    return {
-                        icon: <PhoneOff/>,
-                        text: 'Busy',
-                        variant: 'warning',
-                        description: 'Recipient phone is busy'
-                    };
-                case 'no-answer':
-                    return {
-                        icon: <X/>,
-                        text: 'No Answer',
-                        variant: 'warning',
-                        description: 'Call was not answered'
-                    };
-                case 'cancelling':
-                    return {
-                        icon: <PhoneOff className="animate-pulse"/>,
-                        text: 'Cancelling',
-                        variant: 'warning',
-                        description: 'Call is being cancelled'
-                    };
-                case 'completed':
-                    return {
-                        icon: <CheckCircle/>,
-                        text: 'Completed',
-                        variant: 'success',
-                        description: 'Call has completed successfully'
-                    };
-                default:
-                    return {
-                        icon: <Clock/>,
-                        text: status.charAt(0).toUpperCase() + status.slice(1),
-                        variant: 'info',
-                        description: 'Call status: ' + status
-                    };
-            }
+            return getStatusDisplay(status);
         }
-
         // Handle completed call phases
         else if (call.phase === 'completed') {
             // Get status from completed call API
             const callState = call.details && call.details.call_state;
-            const hangupCause = call.details && call.details.hangup_cause_name;
 
-            if (callState === 'ANSWER') {
-                return {
-                    icon: <CheckCircle/>,
-                    text: 'Completed',
-                    variant: 'success', // Changed from 'info' to 'success'
-                    description: 'Call completed successfully'
-                };
-            } else if (callState === 'BUSY') {
-                return {
-                    icon: <PhoneOff/>,
-                    text: 'Busy',
-                    variant: 'warning',
-                    description: 'Recipient phone was busy'
-                };
-            } else if (callState === 'NO_ANSWER') {
-                return {
-                    icon: <X/>,
-                    text: 'No Answer',
-                    variant: 'warning',
-                    description: 'Call was not answered'
-                };
-            } else if (callState === 'EARLY MEDIA') {
-                return {
-                    icon: <AlertCircle/>,
-                    text: 'Early Media',
-                    variant: 'warning',
-                    description: 'Call was in early media state before completion'
-                };
-            } else if (callState === 'TIMEOUT') {
-                return {
-                    icon: <Clock/>,
-                    text: 'Timed Out',
-                    variant: 'warning',
-                    description: 'Call timed out before connecting'
-                };
-            } else if (callState === 'FAILED') {
-                return {
-                    icon: <XCircle/>,
-                    text: 'Failed',
-                    variant: 'error',
-                    description: 'Call failed to connect'
-                };
-            } else if (hangupCause === 'Busy Line') {
-                return {
-                    icon: <PhoneOff/>,
-                    text: 'Busy Line',
-                    variant: 'warning',
-                    description: 'Recipient line was busy'
-                };
-            } else if (hangupCause === 'NORMAL_CLEARING') {
-                return {
-                    icon: <CheckCircle/>,
-                    text: 'Normal Clearing',
-                    variant: 'success',
-                    description: 'Call ended normally'
-                };
-            } else if (hangupCause) {
-                return {
-                    icon: <AlertCircle/>,
-                    text: hangupCause,
-                    variant: 'error',
-                    description: `Call ended: ${hangupCause}`
-                };
-            } else {
-                return {
-                    icon: <PhoneOff/>,
-                    text: 'Ended',
-                    variant: 'default',
-                    description: 'Call has ended'
-                };
-            }
+            // Use the Plivo call state
+            return getStatusDisplay(callState, true);
         }
 
-        // Default case
-        return {
-            icon: <Info/>,
-            text: 'Unknown',
-            variant: 'default',
-            description: 'Call status could not be determined'
-        };
+        // Default case - unknown status
+        return getStatusDisplay(CALL_STATUS.UNKNOWN);
     };
 
     const handleViewAnalysis = () => {
@@ -260,7 +137,8 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
             });
     };
 
-    const statusDisplay = getStatusDisplay();
+    // Get the current status display object
+    const currentStatus = statusDisplay();
 
     return (
         <Card className="overflow-hidden shadow-elegant">
@@ -338,34 +216,36 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                         <div className="flex items-center justify-between mb-4">
                                 <div className="text-sm text-gray-400">Call Status</div>
                                 <Badge
-                                    variant={statusDisplay.variant}
+                                    variant={currentStatus.variant}
                                     pill
-                                    glow={statusDisplay.text === 'In Progress' || statusDisplay.text === 'Ringing'}
+                                    glow={currentStatus.text === 'In Progress' || currentStatus.text === 'Ringing'}
                                 >
                                     <div className="flex items-center">
-                                        {statusDisplay.icon}
-                                        <span className="ml-1">{statusDisplay.text}</span>
+                                        {currentStatus.icon}
+                                        <span className="ml-1">{currentStatus.text}</span>
                                     </div>
                                 </Badge>
                             </div>
 
-                            <p className="text-xs text-gray-400 mb-3">{statusDisplay.description}</p>
+                            <p className="text-xs text-gray-400 mb-3">{currentStatus.description}</p>
 
                             {/* Status change timeline */}
                             {call.statusHistory && call.statusHistory.length > 1 && (
                                 <div className="flex justify-between p-2 bg-dark-800/70 rounded-lg mb-3">
                                     <span className="text-xs text-gray-400">Timeline:</span>
                                     <span className="text-xs font-medium text-white">
-      {call.statusHistory.map((s, i) => (
-          <span key={i} className={`inline-block mx-1 
-          ${s.status === 'ringing' ? 'text-yellow-400' :
-              s.status === 'in-progress' ? 'text-blue-400' :
-                  s.status === 'completed' ? 'text-green-400' : 'text-white'}`}>
-          {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-              {i < call.statusHistory.length - 1 && ' → '}
-        </span>
-      ))}
-    </span>
+                                        {call.statusHistory.map((s, i) => {
+                                            const statusInfo = getStatusDisplay(s.status);
+                                            return (
+                                                <span key={i} className={`inline-block mx-1 text-${statusInfo.variant === 'success' ? 'green' : 
+                                                    statusInfo.variant === 'warning' ? 'yellow' : 
+                                                    statusInfo.variant === 'info' ? 'blue' : 'white'}-400`}>
+                                                    {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                                                    {i < call.statusHistory.length - 1 && ' → '}
+                                                </span>
+                                            );
+                                        })}
+                                    </span>
                                 </div>
                             )}
 
@@ -374,16 +254,18 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                                 {call.details && call.details.call_duration && (
                                     <div className="flex justify-between p-2 bg-dark-800/50 rounded-lg">
                                         <span className="text-sm text-gray-400">Duration:</span>
-                                        <span
-                                            className="font-medium text-white">{call.details.call_duration} seconds</span>
+                                        <span className="font-medium text-white">
+                                            {formatCallDuration(call.details.call_duration)}
+                                        </span>
                                     </div>
                                 )}
 
                                 {call.phase === 'live' && call.details && call.details.session_start && (
                                     <div className="flex justify-between p-2 bg-dark-800/50 rounded-lg">
                                         <span className="text-sm text-gray-400">Started:</span>
-                                        <span
-                                            className="font-medium text-white">{new Date(call.details.session_start).toLocaleString()}</span>
+                                        <span className="font-medium text-white">
+                                            {new Date(call.details.session_start).toLocaleString()}
+                                        </span>
                                     </div>
                                 )}
 
@@ -404,7 +286,18 @@ const CallStatus = ({call, onRefreshStatus, loading, onViewAnalysis}) => {
                                 {call.details && call.details.hangup_cause_name && (
                                     <div className="flex justify-between p-2 bg-dark-800/50 rounded-lg">
                                         <span className="text-sm text-gray-400">Hangup Cause:</span>
-                                        <span className="font-medium text-white">{call.details.hangup_cause_name}</span>
+                                        <span className="font-medium text-white" title={getHangupCauseDescription(call.details.hangup_cause_name)}>
+                                            {call.details.hangup_cause_name}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {call.details && call.details.hangup_source && (
+                                    <div className="flex justify-between p-2 bg-dark-800/50 rounded-lg">
+                                        <span className="text-sm text-gray-400">Hangup Source:</span>
+                                        <span className="font-medium text-white" title={getHangupSourceDescription(call.details.hangup_source)}>
+                                            {call.details.hangup_source}
+                                        </span>
                                     </div>
                                 )}
                             </div>

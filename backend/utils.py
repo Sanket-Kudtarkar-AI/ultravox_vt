@@ -11,8 +11,8 @@ def get_join_url(ultravox_payload):
     """
     # Get the logger that was set up in the main modules
     logger = logging.getLogger("plivo_server")
-    logger.info(f"System Prompt:\n {json.dumps(ultravox_payload)}")
-    logger.info(f"Getting joinUrl with payload: {json.dumps(ultravox_payload)}")
+    # logger.info(f"System Prompt:\n {json.dumps(ultravox_payload)}")
+    logger.info(f"Getting joinUrl with payload:")
 
     api_url = f"{ULTRAVOX_API_BASE_URL}/calls?enableGreetingPrompt=true"
     payload = json.dumps(ultravox_payload)

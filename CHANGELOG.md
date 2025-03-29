@@ -1,10 +1,45 @@
 # Changelog
 
-
 All notable changes to the AI Voice Call System will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.11.2] - 2025-03-29
+
+### Added
+- Central call status utility module (`src/utils/callStatusUtils.js`) with comprehensive status definitions
+- Standardized status display across all call-related components
+- Detailed descriptions for all call statuses, hangup causes, and hangup sources
+- Human-readable duration formatting with proper units (hours, minutes, seconds)
+- Tooltip descriptions for technical status information
+- Consistent status icon and color scheme application throughout the UI
+- Status-specific badge and animation handling
+
+### Changed
+- Enhanced CallStatus.jsx to use centralized status utility functions
+- Updated CallDetails.jsx with improved status handling and information display
+- Improved RecentCalls.jsx with consistent status badges and better call duration display
+- Optimized UI components to handle all possible call status scenarios
+- Adopted a standardized approach to status display across components
+- Enhanced readability of technical status information with descriptive tooltips
+- Improved disabled state handling for Analysis buttons based on call status
+
+### Fixed
+- Inconsistent status display between different components
+- Confusing technical status terminology without proper explanations
+- Non-user-friendly duration display (only showing raw seconds)
+- Incorrect status coloring in timeline displays
+- Missing or inconsistent use of status icons
+- Cryptic hangup causes and sources without clear descriptions
+- Incomplete handling of edge-case call statuses
+
+### Technical
+- Implemented centralized constants for all call status related values
+- Created helper functions for consistent status presentation
+- Added defensive coding to handle unexpected status values
+- Improved code organization by centralizing display logic
+- Enhanced maintainability with single-source-of-truth approach to status handling
 
 ## [1.10.1] - 2025-03-28
 

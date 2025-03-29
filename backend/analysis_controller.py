@@ -362,7 +362,7 @@ def get_call_analytics(call_id, call_uuid):
                             except ValueError:
                                 logger.warning(f"Could not parse initiation_time: {call_details.initiation_time}")
 
-                        call_log.hangup_cause = call_details.hangup_cause_name if hasattr(call_details,
+                        call_log.hangup_cause_name = call_details.hangup_cause_name if hasattr(call_details,
                                                                                           'hangup_cause_name') else None
                         call_log.hangup_source = call_details.hangup_source if hasattr(call_details,
                                                                                        'hangup_source') else None
